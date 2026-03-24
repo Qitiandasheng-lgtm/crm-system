@@ -358,6 +358,52 @@ function deleteLead(id) {
   showToast('已删除'); renderPage('leads');
 }
 
+function editLead(id) {
+  const lead = DB.get('leads').find(l => l.id === id);
+  if (!lead) return;
+  closeModal('detailModal');
+  refreshAllSelects();
+  setTimeout(() => {
+    document.getElementById('lead-company').value = lead.company || '';
+    document.getElementById('lead-contact').value = lead.contact || '';
+    document.getElementById('lead-phone').value = lead.phone || '';
+    document.getElementById('lead-source').value = lead.source || '';
+    document.getElementById('lead-owner').value = lead.owner || '';
+    document.getElementById('lead-nextfollow').value = lead.nextfollow || '';
+    document.getElementById('lead-note').value = lead.note || '';
+    const saveBtn = document.querySelector('#addLeadModal .modal-footer .btn-primary');
+    saveBtn.textContent = '保存修改';
+    saveBtn.onclick = () => updateLead(id);
+    document.querySelector('#addLeadModal .modal-header h3').textContent = '编辑线索';
+    document.getElementById('addLeadModal').classList.add('active');
+    document.getElementById('overlay').classList.add('active');
+  }, 100);
+}
+
+function updateLead(id) {
+  const company = document.getElementById('lead-company').value.trim();
+  const contact = document.getElementById('lead-contact').value.trim();
+  if (!company || !contact) { showToast('请填写公司名称和联系人', 'error'); return; }
+  const leads = DB.get('leads');
+  const lead = leads.find(l => l.id === id);
+  if (!lead) return;
+  lead.company = company; lead.contact = contact;
+  lead.phone = document.getElementById('lead-phone').value;
+  lead.source = document.getElementById('lead-source').value;
+  lead.owner = document.getElementById('lead-owner').value;
+  lead.nextfollow = document.getElementById('lead-nextfollow').value;
+  lead.note = document.getElementById('lead-note').value;
+  DB.set('leads', leads);
+  addActivity(`编辑线索：${company}`, 'fas fa-edit');
+  closeModal('addLeadModal');
+  // 重置按钮
+  const saveBtn = document.querySelector('#addLeadModal .modal-footer .btn-primary');
+  saveBtn.textContent = '保存线索'; saveBtn.onclick = saveLead;
+  document.querySelector('#addLeadModal .modal-header h3').textContent = '新增线索';
+  ['lead-company','lead-contact','lead-phone','lead-nextfollow','lead-note'].forEach(i => document.getElementById(i).value = '');
+  showToast('线索已更新！'); renderPage('leads');
+}
+
 function viewLeadDetail(id) {
   const lead = DB.get('leads').find(l => l.id === id);
   if (!lead) return;
@@ -388,7 +434,8 @@ function viewLeadDetail(id) {
             </div>`).join('')}
       </div>
     </div>
-    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="editLead('${id}')"><i class="fas fa-edit"></i> 编辑线索</button>
       <button class="btn btn-primary btn-sm" onclick="quickFollowup('${lead.company}','lead_${id}');closeModal('detailModal')"><i class="fas fa-plus"></i> 新增跟进</button>
       <button class="btn btn-success btn-sm" onclick="convertLeadToCustomer('${id}');closeModal('detailModal')"><i class="fas fa-arrow-right"></i> 转为客户</button>
     </div>`;
@@ -460,6 +507,55 @@ function deleteCustomer(id) {
   showToast('已删除'); renderPage('customers');
 }
 
+function editCustomer(id) {
+  const c = DB.get('customers').find(c => c.id === id);
+  if (!c) return;
+  closeModal('detailModal');
+  refreshAllSelects();
+  setTimeout(() => {
+    document.getElementById('cust-company').value = c.company || '';
+    document.getElementById('cust-contact').value = c.contact || '';
+    document.getElementById('cust-phone').value = c.phone || '';
+    document.getElementById('cust-email').value = c.email || '';
+    document.getElementById('cust-industry').value = c.industry || '';
+    document.getElementById('cust-level').value = c.level || 'B';
+    document.getElementById('cust-owner').value = c.owner || '';
+    document.getElementById('cust-address').value = c.address || '';
+    document.getElementById('cust-note').value = c.note || '';
+    const saveBtn = document.querySelector('#addCustomerModal .modal-footer .btn-primary');
+    saveBtn.textContent = '保存修改';
+    saveBtn.onclick = () => updateCustomer(id);
+    document.querySelector('#addCustomerModal .modal-header h3').textContent = '编辑客户';
+    document.getElementById('addCustomerModal').classList.add('active');
+    document.getElementById('overlay').classList.add('active');
+  }, 100);
+}
+
+function updateCustomer(id) {
+  const company = document.getElementById('cust-company').value.trim();
+  const contact = document.getElementById('cust-contact').value.trim();
+  const phone = document.getElementById('cust-phone').value.trim();
+  if (!company || !contact || !phone) { showToast('请填写公司名称、联系人和联系电话', 'error'); return; }
+  const customers = DB.get('customers');
+  const c = customers.find(c => c.id === id);
+  if (!c) return;
+  c.company = company; c.contact = contact; c.phone = phone;
+  c.email = document.getElementById('cust-email').value;
+  c.industry = document.getElementById('cust-industry').value;
+  c.level = document.getElementById('cust-level').value;
+  c.owner = document.getElementById('cust-owner').value;
+  c.address = document.getElementById('cust-address').value;
+  c.note = document.getElementById('cust-note').value;
+  DB.set('customers', customers);
+  addActivity(`编辑客户：${company}`, 'fas fa-edit');
+  closeModal('addCustomerModal');
+  const saveBtn = document.querySelector('#addCustomerModal .modal-footer .btn-primary');
+  saveBtn.textContent = '保存客户'; saveBtn.onclick = saveCustomer;
+  document.querySelector('#addCustomerModal .modal-header h3').textContent = '新增客户';
+  ['cust-company','cust-contact','cust-phone','cust-email','cust-address','cust-note'].forEach(i => document.getElementById(i).value = '');
+  showToast('客户信息已更新！'); renderPage('customers');
+}
+
 function viewCustomerDetail(id) {
   const c = DB.get('customers').find(c => c.id === id);
   if (!c) return;
@@ -501,6 +597,7 @@ function viewCustomerDetail(id) {
       </div>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="editCustomer('${id}')"><i class="fas fa-edit"></i> 编辑客户</button>
       <button class="btn btn-outline btn-sm" onclick="quickFollowup('${c.company}','cust_${id}');closeModal('detailModal')"><i class="fas fa-bell"></i> 新增跟进</button>
       <button class="btn btn-primary btn-sm" onclick="closeModal('detailModal');openModal('addOppModal')"><i class="fas fa-fire"></i> 新增商机</button>
     </div>`;
@@ -608,6 +705,7 @@ function viewOppDetail(id) {
     ${opp.note ? `<div class="detail-section"><h4>备注</h4><p style="font-size:13px;color:#555">${opp.note}</p></div>` : ''}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
       ${opp.stage !== 'won' && opp.stage !== 'lost' ? `<button class="btn btn-primary btn-sm" onclick="moveOppStage('${opp.id}');closeModal('detailModal')"><i class="fas fa-arrow-right"></i> 推进阶段</button>` : ''}
+      <button class="btn btn-outline btn-sm" onclick="editOpp('${opp.id}')"><i class="fas fa-edit"></i> 编辑商机</button>
       <button class="btn btn-danger btn-sm" onclick="markOppLost('${opp.id}');closeModal('detailModal')"><i class="fas fa-times"></i> 标记失败</button>
     </div>`;
   openModal('detailModal');
@@ -632,6 +730,79 @@ function markOppLost(id) {
   const opps = DB.get('opportunities');
   const opp = opps.find(o => o.id === id);
   if (opp) { opp.stage = 'lost'; DB.set('opportunities', opps); addActivity(`商机失败：${opp.name}`, 'fas fa-times'); renderPage('opportunities'); }
+}
+
+function editOpp(id) {
+  const opp = DB.get('opportunities').find(o => o.id === id);
+  if (!opp) return;
+  closeModal('detailModal');
+  refreshAllSelects(); refreshProductSelects(); refreshCustomerSelects();
+  setTimeout(() => {
+    document.getElementById('opp-name').value = opp.name || '';
+    document.getElementById('opp-customer').value = opp.customerId || '';
+    document.getElementById('opp-amount').value = opp.amount || '';
+    document.getElementById('opp-stage').value = opp.stage || 'needs_analysis';
+    document.getElementById('opp-owner').value = opp.owner || '';
+    document.getElementById('opp-closedate').value = opp.closedate || '';
+    document.getElementById('opp-note').value = opp.note || '';
+    // 填充需求项
+    const s = getSettings();
+    const baseOpts = `<option value="">关联产品/方案</option>` + (s.products||[]).map(p=>`<option>${p}</option>`).join('');
+    const needsHtml = (opp.needs||[{desc:'',product:'',amount:''}]).map(n =>
+      `<div class="need-item">
+        <input type="text" placeholder="需求描述" class="need-desc" value="${n.desc||''}">
+        <select class="need-product">${baseOpts}</select>
+        <input type="number" placeholder="预估金额(万)" class="need-amount" value="${n.amount||''}">
+      </div>`).join('');
+    document.getElementById('needsList').innerHTML = needsHtml;
+    // 设置产品选中值
+    document.querySelectorAll('#needsList .need-item').forEach((item, i) => {
+      const sel = item.querySelector('.need-product');
+      if (opp.needs && opp.needs[i]) sel.value = opp.needs[i].product || '';
+    });
+    const saveBtn = document.querySelector('#addOppModal .modal-footer .btn-primary');
+    saveBtn.textContent = '保存修改'; saveBtn.onclick = () => updateOpp(id);
+    document.querySelector('#addOppModal .modal-header h3').textContent = '编辑商机';
+    document.getElementById('addOppModal').classList.add('active');
+    document.getElementById('overlay').classList.add('active');
+  }, 100);
+}
+
+function updateOpp(id) {
+  const name = document.getElementById('opp-name').value.trim();
+  if (!name) { showToast('请填写商机名称', 'error'); return; }
+  const opps = DB.get('opportunities');
+  const opp = opps.find(o => o.id === id);
+  if (!opp) return;
+  const custVal = document.getElementById('opp-customer').value;
+  let customerName = opp.customerName;
+  if (custVal) {
+    const custId = custVal.replace('cust_','').replace('lead_','');
+    const found = [...DB.get('customers'), ...DB.get('leads')].find(c => c.id === custId);
+    if (found) customerName = found.company;
+  }
+  const needs = [];
+  document.querySelectorAll('#needsList .need-item').forEach(item => {
+    const desc = item.querySelector('.need-desc').value;
+    const product = item.querySelector('.need-product').value;
+    const amount = item.querySelector('.need-amount').value;
+    if (desc) needs.push({ desc, product, amount });
+  });
+  opp.name = name; opp.customerId = custVal; opp.customerName = customerName;
+  opp.amount = document.getElementById('opp-amount').value;
+  opp.stage = document.getElementById('opp-stage').value;
+  opp.owner = document.getElementById('opp-owner').value;
+  opp.closedate = document.getElementById('opp-closedate').value;
+  opp.note = document.getElementById('opp-note').value;
+  opp.needs = needs;
+  DB.set('opportunities', opps);
+  addActivity(`编辑商机：${name}`, 'fas fa-edit');
+  closeModal('addOppModal');
+  const saveBtn = document.querySelector('#addOppModal .modal-footer .btn-primary');
+  saveBtn.textContent = '保存商机'; saveBtn.onclick = saveOpportunity;
+  document.querySelector('#addOppModal .modal-header h3').textContent = '新增商机';
+  ['opp-name','opp-amount','opp-closedate','opp-note'].forEach(i => document.getElementById(i).value = '');
+  showToast('商机已更新！'); renderPage('opportunities');
 }
 
 // ============ 合同管理 ============
@@ -667,11 +838,19 @@ function saveContract() {
     status: document.getElementById('contract-status').value,
     owner: document.getElementById('contract-owner').value,
     note: document.getElementById('contract-note').value,
+    invoiceTitle: document.getElementById('contract-invoice-title').value.trim(),
+    invoiceTaxNo: document.getElementById('contract-invoice-taxno').value.trim(),
+    invoiceBank: document.getElementById('contract-invoice-bank').value.trim(),
+    invoiceAccount: document.getElementById('contract-invoice-account').value.trim(),
+    invoiceAddress: document.getElementById('contract-invoice-address').value.trim(),
+    invoicePhone: document.getElementById('contract-invoice-phone').value.trim(),
     fileName, createdAt: new Date().toISOString()
   };
   const contracts = DB.get('contracts'); contracts.push(contract); DB.set('contracts', contracts);
   addActivity(`上传合同：${no}（¥${amount}万）`, 'fas fa-file-contract');
   closeModal('addContractModal');
+  // 清空发票字段
+  ['contract-no','contract-amount','contract-note','contract-invoice-title','contract-invoice-taxno','contract-invoice-bank','contract-invoice-account','contract-invoice-address','contract-invoice-phone'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   showToast('合同保存成功！'); renderPage('contracts');
 }
 
@@ -684,6 +863,7 @@ function deleteContract(id) {
 function viewContractDetail(id) {
   const c = DB.get('contracts').find(c => c.id === id);
   if (!c) return;
+  const hasInvoice = c.invoiceTitle || c.invoiceTaxNo;
   document.getElementById('detailTitle').textContent = `合同详情：${c.no}`;
   document.getElementById('detailContent').innerHTML = `
     <div class="detail-section"><h4>合同信息</h4>
@@ -697,7 +877,17 @@ function viewContractDetail(id) {
         <div class="detail-item"><label>附件</label><span>${c.fileName||'暂无附件'}</span></div>
         ${c.note ? `<div class="detail-item" style="grid-column:1/-1"><label>备注</label><span>${c.note}</span></div>` : ''}
       </div>
-    </div>`;
+    </div>
+    ${hasInvoice ? `<div class="detail-section"><h4><i class="fas fa-file-invoice" style="color:#e65100;margin-right:6px"></i>发票抬头信息</h4>
+      <div class="detail-grid">
+        ${c.invoiceTitle ? `<div class="detail-item" style="grid-column:1/-1"><label>发票抬头</label><span style="font-weight:600">${c.invoiceTitle}</span></div>` : ''}
+        ${c.invoiceTaxNo ? `<div class="detail-item"><label>税号</label><span style="font-family:monospace">${c.invoiceTaxNo}</span></div>` : ''}
+        ${c.invoiceBank ? `<div class="detail-item"><label>开户银行</label><span>${c.invoiceBank}</span></div>` : ''}
+        ${c.invoiceAccount ? `<div class="detail-item"><label>银行账号</label><span style="font-family:monospace">${c.invoiceAccount}</span></div>` : ''}
+        ${c.invoiceAddress ? `<div class="detail-item"><label>注册地址</label><span>${c.invoiceAddress}</span></div>` : ''}
+        ${c.invoicePhone ? `<div class="detail-item"><label>注册电话</label><span>${c.invoicePhone}</span></div>` : ''}
+      </div>
+    </div>` : ''}`;
   openModal('detailModal');
 }
 
@@ -1110,7 +1300,10 @@ function clearCardForm() {
   document.getElementById('card-industry').value = '';
   document.getElementById('cardPreview').style.display = 'none';
   document.getElementById('cardUploadArea').style.display = 'block';
-  document.getElementById('cardImageInput').value = '';
+  const cam = document.getElementById('cardImageCamera');
+  const gal = document.getElementById('cardImageGallery');
+  if (cam) cam.value = '';
+  if (gal) gal.value = '';
 }
 
 function getCardData() {
@@ -1207,14 +1400,65 @@ function clearAllData() {
   renderPage('dashboard');
 }
 
-// ============ 合同文件名显示 ============
+// ============ 合同文件名显示 + 发票图片识别 ============
 document.addEventListener('change', function(e) {
   if (e.target.id === 'contractFile') {
     const f = e.target.files[0];
     const d = document.getElementById('contractFileName');
     if (f && d) d.textContent = '已选择：' + f.name;
   }
+  if (e.target.id === 'invoiceImageInput') {
+    const file = e.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('invoiceOcrStatus');
+    if (statusEl) { statusEl.textContent = '识别中，请稍候...'; statusEl.style.color = '#1976d2'; }
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+      // 显示预览
+      const prevEl = document.getElementById('invoiceImgPreview');
+      if (prevEl) { prevEl.src = ev.target.result; prevEl.style.display = 'block'; }
+      // 尝试OCR
+      if (window.Tesseract) {
+        Tesseract.recognize(ev.target.result, 'chi_sim+eng', { logger: () => {} })
+          .then(({ data: { text } }) => {
+            parseInvoiceText(text);
+            if (statusEl) { statusEl.textContent = '识别完成，请核对并补充信息'; statusEl.style.color = '#388e3c'; }
+          }).catch(() => {
+            if (statusEl) { statusEl.textContent = '自动识别失败，请手动填写'; statusEl.style.color = '#e53935'; }
+          });
+      } else {
+        if (statusEl) { statusEl.textContent = '请手动填写下方发票信息'; statusEl.style.color = '#888'; }
+      }
+    };
+    reader.readAsDataURL(file);
+  }
 });
+
+function parseInvoiceText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const fullText = lines.join(' ');
+  // 提取税号（15-20位字母数字）
+  const taxMatch = fullText.match(/[0-9A-Z]{15,20}/);
+  if (taxMatch) { const el = document.getElementById('contract-invoice-taxno'); if (el && !el.value) el.value = taxMatch[0]; }
+  // 提取银行账号（一串数字）
+  const bankAccMatch = fullText.match(/\d{16,22}/);
+  if (bankAccMatch) { const el = document.getElementById('contract-invoice-account'); if (el && !el.value) el.value = bankAccMatch[0]; }
+  // 提取电话
+  const phoneMatch = fullText.match(/[\d\-]{7,12}/);
+  if (phoneMatch) { const el = document.getElementById('contract-invoice-phone'); if (el && !el.value) el.value = phoneMatch[0]; }
+  // 尝试找公司名（含"有限公司"/"集团"的行）
+  for (const line of lines) {
+    if ((line.includes('有限') || line.includes('集团') || line.includes('股份')) && line.length > 4 && line.length < 50) {
+      const el = document.getElementById('contract-invoice-title'); if (el && !el.value) { el.value = line; break; }
+    }
+  }
+  // 尝试找银行名
+  for (const line of lines) {
+    if (line.includes('银行') && line.length < 30) {
+      const el = document.getElementById('contract-invoice-bank'); if (el && !el.value) { el.value = line; break; }
+    }
+  }
+}
 
 // ============ 时间显示 ============
 function updateTime() {
@@ -1237,8 +1481,15 @@ document.getElementById('mobileMenuBtn').addEventListener('click', function() {
   overlay.classList.toggle('active');
 });
 
-// ============ 导航绑定 ============
+// ============ 导航绑定（修复移动端需要双击的问题）============
 document.querySelectorAll('.nav-item').forEach(item => {
+  // 移动端触摸事件
+  item.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    const page = this.dataset.page;
+    if (page) navigateTo(page);
+  }, { passive: false });
+  // 桌面点击事件
   item.addEventListener('click', function(e) {
     e.preventDefault();
     const page = this.dataset.page;
