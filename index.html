@@ -499,16 +499,29 @@
     <div class="invoice-section">
       <div class="invoice-section-header">
         <h4><i class="fas fa-file-invoice" style="color:#e65100;margin-right:6px"></i>发票抬头信息</h4>
-        <span style="font-size:12px;color:#888">可上传增值税发票图片自动识别</span>
+        <span style="font-size:12px;color:#888">粘贴开票资料文字，一键识别填充</span>
       </div>
-      <div class="invoice-upload-row">
-        <div class="invoice-img-upload" onclick="document.getElementById('invoiceImageInput').click()">
-          <i class="fas fa-camera"></i>
-          <span>上传发票图片识别</span>
+      <!-- 快速粘贴识别（主方式） -->
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <button type="button" class="btn btn-sm" style="background:#fff3e0;color:#e65100;border:1px solid #ffcc80;font-size:13px" onclick="document.getElementById('invoicePasteBox').style.display=document.getElementById('invoicePasteBox').style.display==='none'?'block':'none'">
+            <i class="fas fa-paste"></i> 粘贴开票资料文字识别
+          </button>
+          <button type="button" class="btn btn-sm btn-outline" style="font-size:12px" onclick="document.getElementById('invoiceImageInput').click()">
+            <i class="fas fa-image"></i> 上传图片
+          </button>
           <input type="file" id="invoiceImageInput" accept="image/*" style="display:none">
         </div>
-        <img id="invoiceImgPreview" src="" alt="发票预览" style="display:none;max-height:80px;border-radius:6px;border:1px solid #eee">
-        <div id="invoiceOcrStatus" style="font-size:12px;color:#888;margin-top:4px"></div>
+        <!-- 粘贴文字区域 -->
+        <div id="invoicePasteBox" style="display:none">
+          <textarea id="invoicePasteArea" rows="5" placeholder="将开票资料文字粘贴到这里，例如：&#10;公司名称：温州盛世机车业有限公司&#10;纳税人识别号：91330304797609680M&#10;地址、电话：浙江省温州市...&#10;开户行及帐号：温州瓯海农村商业银行...梓岙支行 201000019794288" style="width:100%;padding:8px 10px;border:1px solid #ffcc80;border-radius:8px;font-size:13px;resize:vertical;background:#fffaf0;box-sizing:border-box;line-height:1.6"></textarea>
+          <button type="button" class="btn btn-primary btn-sm" onclick="parseInvoiceFromPaste()" style="margin-top:6px;width:100%"><i class="fas fa-magic"></i> 自动识别填充</button>
+        </div>
+        <!-- 图片预览 & 状态 -->
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:4px">
+          <img id="invoiceImgPreview" src="" alt="发票预览" style="display:none;max-height:70px;border-radius:6px;border:1px solid #eee">
+          <div id="invoiceOcrStatus" style="font-size:12px;color:#888"></div>
+        </div>
       </div>
       <div class="form-grid" style="margin-top:12px">
         <div class="form-group full-width"><label>发票抬头（公司名称）</label><input type="text" id="contract-invoice-title" placeholder="企业全称，如：xx有限公司"></div>
