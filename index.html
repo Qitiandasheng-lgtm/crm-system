@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="format-detection" content="telephone=no">
+<title>销售CRM系统</title>
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+<!-- 登录遮罩 -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div class="login-logo">
+      <i class="fas fa-briefcase"></i>
+      <h2>销售CRM系统</h2>
+      <p>请输入访问密码</p>
+    </div>
+    <div class="login-form">
+      <input type="password" id="loginPassword" placeholder="请输入密码" onkeypress="if(event.key==='Enter')checkLogin()">
+      <button onclick="checkLogin()" class="login-btn">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- 侧边栏导航 -->
+<div class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="logo">
+      <i class="fas fa-briefcase"></i>
+      <span class="logo-text">销售CRM</span>
+    </div>
+    <button class="sidebar-toggle" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+  </div>
+  <nav class="sidebar-nav">
+    <a href="#" class="nav-item active" data-page="dashboard"><i class="fas fa-chart-pie"></i><span>工作台</span></a>
+    <a href="#" class="nav-item" data-page="leads"><i class="fas fa-user-plus"></i><span>线索管理</span></a>
+    <a href="#" class="nav-item" data-page="customers"><i class="fas fa-users"></i><span>客户管理</span></a>
+    <a href="#" class="nav-item" data-page="opportunities"><i class="fas fa-fire"></i><span>商机管理</span></a>
+    <a href="#" class="nav-item" data-page="contracts"><i class="fas fa-file-contract"></i><span>合同管理</span></a>
+    <a href="#" class="nav-item" data-page="projects"><i class="fas fa-tasks"></i><span>项目实施</span></a>
+    <a href="#" class="nav-item" data-page="followup">
+      <i class="fas fa-bell"></i><span>跟进提醒</span>
+      <span class="badge" id="followupBadge">0</span>
+    </a>
+    <a href="#" class="nav-item" data-page="maintenance"><i class="fas fa-heart"></i><span>客户维护</span></a>
+    <a href="#" class="nav-item" data-page="card"><i class="fas fa-id-card"></i><span>名片录入</span></a>
+    <div class="nav-divider"></div>
+    <a href="#" class="nav-item" data-page="settings"><i class="fas fa-cog"></i><span>系统设置</span></a>
+  </nav>
+</div>
+
+<!-- 主内容区 -->
+<div class="main-content" id="mainContent">
+  <div class="topbar">
+    <button class="mobile-menu-btn" id="mobileMenuBtn"><i class="fas fa-bars"></i></button>
+    <h1 class="page-title" id="pageTitle">工作台</h1>
+    <div class="topbar-right">
+      <div class="current-time" id="currentTime"></div>
+      <div class="user-info"><i class="fas fa-user-circle"></i><span id="currentUserName">管理员</span></div>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <!-- ===== 工作台 ===== -->
+    <div id="page-dashboard" class="page active">
+      <!-- 统计卡片（可点击跳转） -->
+      <div class="stats-grid">
+        <div class="stat-card blue clickable" onclick="navigateTo('leads')">
+          <div class="stat-icon"><i class="fas fa-user-plus"></i></div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-leads">0</div>
+            <div class="stat-label">待跟进线索</div>
+          </div>
+        </div>
+        <div class="stat-card orange clickable" onclick="navigateTo('opportunities')">
+          <div class="stat-icon"><i class="fas fa-fire"></i></div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-opps">0</div>
+            <div class="stat-label">进行中商机</div>
+          </div>
+        </div>
+        <div class="stat-card green clickable" onclick="navigateTo('contracts')">
+          <div class="stat-icon"><i class="fas fa-handshake"></i></div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-contracts">0</div>
+            <div class="stat-label">本月成交</div>
+          </div>
+        </div>
+        <div class="stat-card red clickable" onclick="navigateTo('followup')">
+          <div class="stat-icon"><i class="fas fa-bell"></i></div>
+          <div class="stat-info">
+            <div class="stat-value" id="stat-reminders">0</div>
+            <div class="stat-label">今日待跟进</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 金额汇总条 -->
+      <div class="amount-summary">
+        <div class="amount-item">
+          <span class="amount-label"><i class="fas fa-chart-bar"></i> 商机总金额</span>
+          <span class="amount-value" id="sum-opps">¥0万</span>
+        </div>
+        <div class="amount-divider"></div>
+        <div class="amount-item">
+          <span class="amount-label"><i class="fas fa-trophy"></i> 本月合同金额</span>
+          <span class="amount-value highlight" id="sum-contracts-month">¥0万</span>
+        </div>
+        <div class="amount-divider"></div>
+        <div class="amount-item">
+          <span class="amount-label"><i class="fas fa-coins"></i> 累计合同金额</span>
+          <span class="amount-value" id="sum-contracts-total">¥0万</span>
+        </div>
+        <div class="amount-divider"></div>
+        <div class="amount-item">
+          <span class="amount-label"><i class="fas fa-hourglass-half"></i> 在谈商机金额</span>
+          <span class="amount-value" id="sum-opps-active">¥0万</span>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="card">
+          <div class="card-header">
+            <h3><i class="fas fa-clock"></i> 今日待办</h3>
+            <button class="btn-link" onclick="navigateTo('followup')">查看全部</button>
+          </div>
+          <div id="todayTasks" class="task-list">
+            <div class="empty-state"><i class="fas fa-check-circle"></i> 暂无待办事项</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3><i class="fas fa-chart-line"></i> 销售漏斗</h3>
+          </div>
+          <div class="funnel-chart">
+            <div class="funnel-item clickable" style="width:100%" onclick="navigateTo('leads')">
+              <span class="funnel-label">线索</span>
+              <span class="funnel-count" id="funnel-leads">0</span>
+            </div>
+            <div class="funnel-item clickable" style="width:80%" onclick="navigateTo('opportunities')">
+              <span class="funnel-label">商机</span>
+              <span class="funnel-count" id="funnel-opps">0</span>
+            </div>
+            <div class="funnel-item clickable" style="width:60%" onclick="navigateTo('opportunities')">
+              <span class="funnel-label">需求确认</span>
+              <span class="funnel-count" id="funnel-needs">0</span>
+            </div>
+            <div class="funnel-item clickable" style="width:40%" onclick="navigateTo('contracts')">
+              <span class="funnel-label">合同签署</span>
+              <span class="funnel-count" id="funnel-contracts">0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-16">
+        <div class="card-header"><h3><i class="fas fa-history"></i> 最近动态</h3></div>
+        <div id="recentActivities" class="activity-list">
+          <div class="empty-state"><i class="fas fa-info-circle"></i> 暂无动态记录</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 线索管理 ===== -->
+    <div id="page-leads" class="page">
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModal('addLeadModal')"><i class="fas fa-plus"></i> 新增线索</button>
+        <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="搜索线索..." id="leadsSearch" oninput="filterList('leads')"></div>
+      </div>
+      <div class="card">
+        <div class="table-container">
+          <table class="data-table">
+            <thead><tr><th>客户名称</th><th>联系人</th><th>来源</th><th>状态</th><th>负责人</th><th>下次跟进</th><th>操作</th></tr></thead>
+            <tbody id="leadsTableBody"><tr><td colspan="7" class="empty-row">暂无线索数据</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 客户管理 ===== -->
+    <div id="page-customers" class="page">
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModal('addCustomerModal')"><i class="fas fa-plus"></i> 新增客户</button>
+        <div class="search-box"><i class="fas fa-search"></i><input type="text" placeholder="搜索客户..." id="customersSearch" oninput="filterList('customers')"></div>
+      </div>
+      <div class="card">
+        <div class="table-container">
+          <table class="data-table">
+            <thead><tr><th>公司名称</th><th>联系人</th><th>电话</th><th>行业</th><th>客户等级</th><th>负责人</th><th>操作</th></tr></thead>
+            <tbody id="customersTableBody"><tr><td colspan="7" class="empty-row">暂无客户数据</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 商机管理 ===== -->
+    <div id="page-opportunities" class="page">
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModal('addOppModal')"><i class="fas fa-plus"></i> 新增商机</button>
+      </div>
+      <div class="kanban-board" id="oppKanban">
+        <div class="kanban-col"><div class="kanban-col-header needs-analysis">需求分析</div><div class="kanban-items" id="kanban-needs_analysis"></div></div>
+        <div class="kanban-col"><div class="kanban-col-header proposal">方案提交</div><div class="kanban-items" id="kanban-proposal"></div></div>
+        <div class="kanban-col"><div class="kanban-col-header negotiation">商务谈判</div><div class="kanban-items" id="kanban-negotiation"></div></div>
+        <div class="kanban-col"><div class="kanban-col-header won">成交</div><div class="kanban-items" id="kanban-won"></div></div>
+        <div class="kanban-col"><div class="kanban-col-header lost">失败</div><div class="kanban-items" id="kanban-lost"></div></div>
+      </div>
+    </div>
+
+    <!-- ===== 合同管理 ===== -->
+    <div id="page-contracts" class="page">
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModal('addContractModal')"><i class="fas fa-plus"></i> 上传合同</button>
+      </div>
+      <div class="card">
+        <div class="table-container">
+          <table class="data-table">
+            <thead><tr><th>合同编号</th><th>客户名称</th><th>合同金额</th><th>签署日期</th><th>状态</th><th>负责人</th><th>操作</th></tr></thead>
+            <tbody id="contractsTableBody"><tr><td colspan="7" class="empty-row">暂无合同数据</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 项目实施 ===== -->
+    <div id="page-projects" class="page">
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModal('addProjectModal')"><i class="fas fa-plus"></i> 新建项目</button>
+      </div>
+      <div id="projectsList" class="projects-grid">
+        <div class="empty-state"><i class="fas fa-project-diagram"></i> 暂无项目</div>
+      </div>
+    </div>
+
+    <!-- ===== 跟进提醒 ===== -->
+    <div id="page-followup" class="page">
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModal('addFollowupModal')"><i class="fas fa-plus"></i> 新增跟进记录</button>
+      </div>
+      <div class="followup-tabs">
+        <button class="tab-btn active" onclick="switchTab('followup','today')">今日到期</button>
+        <button class="tab-btn" onclick="switchTab('followup','upcoming')">即将到期</button>
+        <button class="tab-btn" onclick="switchTab('followup','all')">全部记录</button>
+      </div>
+      <div class="card">
+        <div id="followupList" class="followup-list"><div class="empty-state"><i class="fas fa-bell-slash"></i> 暂无跟进提醒</div></div>
+      </div>
+    </div>
+
+    <!-- ===== 客户维护 ===== -->
+    <div id="page-maintenance" class="page">
+      <div class="page-actions">
+        <button class="btn btn-primary" onclick="openModal('addMaintenanceModal')"><i class="fas fa-plus"></i> 制定维护计划</button>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3><i class="fas fa-calendar-alt"></i> 老客户维护计划</h3></div>
+        <div id="maintenanceList" class="maintenance-list"><div class="empty-state"><i class="fas fa-heart"></i> 暂无维护计划</div></div>
+      </div>
+    </div>
+
+    <!-- ===== 名片录入 ===== -->
+    <div id="page-card" class="page">
+      <div class="card-scan-area">
+        <div class="card">
+          <div class="card-header"><h3><i class="fas fa-id-card"></i> 名片信息录入</h3></div>
+          <div class="card-scan-tips">
+            <div class="tip-item"><i class="fas fa-camera"></i><span>拍照上传名片，手动确认信息后保存为线索或客户</span></div>
+          </div>
+          <div class="card-upload-area" id="cardUploadArea" onclick="document.getElementById('cardImageInput').click()">
+            <i class="fas fa-cloud-upload-alt"></i>
+            <p>点击上传名片图片</p><p class="sub-text">支持 JPG、PNG 格式</p>
+            <input type="file" id="cardImageInput" accept="image/*" capture="environment" style="display:none" onchange="previewCardImage(event)">
+          </div>
+          <div id="cardPreview" style="display:none"><img id="cardPreviewImg" src="" alt="名片预览"></div>
+          <div class="card-form">
+            <h4>填写/确认名片信息</h4>
+            <div class="form-grid">
+              <div class="form-group"><label>姓名 *</label><input type="text" id="card-name" placeholder="联系人姓名"></div>
+              <div class="form-group"><label>职位</label><input type="text" id="card-title" placeholder="职位/头衔"></div>
+              <div class="form-group"><label>公司名称 *</label><input type="text" id="card-company" placeholder="公司全称"></div>
+              <div class="form-group"><label>手机号 *</label><input type="tel" id="card-phone" placeholder="手机号码"></div>
+              <div class="form-group"><label>邮箱</label><input type="email" id="card-email" placeholder="电子邮箱"></div>
+              <div class="form-group"><label>行业</label><select id="card-industry"><option value="">请选择行业</option></select></div>
+              <div class="form-group full-width"><label>地址</label><input type="text" id="card-address" placeholder="公司地址"></div>
+              <div class="form-group full-width"><label>备注</label><textarea id="card-note" placeholder="初次见面的印象、背景信息等..." rows="3"></textarea></div>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn-secondary" onclick="clearCardForm()">清空</button>
+              <button class="btn btn-primary" onclick="saveCardAsLead()">保存为线索</button>
+              <button class="btn btn-success" onclick="saveCardAsCustomer()">保存为客户</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 系统设置 ===== -->
+    <div id="page-settings" class="page">
+      <div class="settings-grid">
+
+        <!-- 团队成员 -->
+        <div class="card settings-card">
+          <div class="card-header"><h3><i class="fas fa-users-cog"></i> 团队成员</h3></div>
+          <div class="settings-body">
+            <div class="settings-list" id="ownersList"></div>
+            <div class="settings-add-row">
+              <input type="text" id="newOwnerInput" placeholder="输入新成员名称" maxlength="10">
+              <button class="btn btn-primary btn-sm" onclick="addSettingItem('owners')"><i class="fas fa-plus"></i> 添加</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 行业类型 -->
+        <div class="card settings-card">
+          <div class="card-header"><h3><i class="fas fa-industry"></i> 行业类型</h3></div>
+          <div class="settings-body">
+            <div class="settings-list" id="industriesList"></div>
+            <div class="settings-add-row">
+              <input type="text" id="newIndustryInput" placeholder="输入行业名称" maxlength="15">
+              <button class="btn btn-primary btn-sm" onclick="addSettingItem('industries')"><i class="fas fa-plus"></i> 添加</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 线索来源 -->
+        <div class="card settings-card">
+          <div class="card-header"><h3><i class="fas fa-filter"></i> 线索来源</h3></div>
+          <div class="settings-body">
+            <div class="settings-list" id="sourcesList"></div>
+            <div class="settings-add-row">
+              <input type="text" id="newSourceInput" placeholder="输入来源名称" maxlength="15">
+              <button class="btn btn-primary btn-sm" onclick="addSettingItem('sources')"><i class="fas fa-plus"></i> 添加</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 产品/方案 -->
+        <div class="card settings-card">
+          <div class="card-header"><h3><i class="fas fa-box"></i> 产品/方案</h3></div>
+          <div class="settings-body">
+            <div class="settings-list" id="productsList"></div>
+            <div class="settings-add-row">
+              <input type="text" id="newProductInput" placeholder="输入产品名称" maxlength="15">
+              <button class="btn btn-primary btn-sm" onclick="addSettingItem('products')"><i class="fas fa-plus"></i> 添加</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 跟进方式 -->
+        <div class="card settings-card">
+          <div class="card-header"><h3><i class="fas fa-comments"></i> 跟进方式</h3></div>
+          <div class="settings-body">
+            <div class="settings-list" id="followupTypesList"></div>
+            <div class="settings-add-row">
+              <input type="text" id="newFollowupTypeInput" placeholder="输入跟进方式" maxlength="10">
+              <button class="btn btn-primary btn-sm" onclick="addSettingItem('followupTypes')"><i class="fas fa-plus"></i> 添加</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 数据管理 -->
+        <div class="card settings-card">
+          <div class="card-header"><h3><i class="fas fa-database"></i> 数据管理</h3></div>
+          <div class="settings-body" style="padding:16px">
+            <p style="font-size:13px;color:#888;margin-bottom:16px">数据保存在本地浏览器，清除浏览器数据会丢失。建议定期导出备份。</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <button class="btn btn-outline" onclick="exportData()"><i class="fas fa-download"></i> 导出全部数据（JSON）</button>
+              <button class="btn btn-outline" onclick="document.getElementById('importFile').click()"><i class="fas fa-upload"></i> 导入数据（JSON）</button>
+              <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+              <button class="btn btn-danger" onclick="clearAllData()"><i class="fas fa-trash"></i> 清空全部数据</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- end page-content -->
+</div><!-- end main-content -->
+
+<!-- 遮罩层 -->
+<div class="overlay" id="overlay" onclick="closeAllModals()"></div>
+
+<!-- ===== 模态框：新增线索 ===== -->
+<div class="modal" id="addLeadModal">
+  <div class="modal-header"><h3>新增线索</h3><button onclick="closeModal('addLeadModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body">
+    <div class="form-grid">
+      <div class="form-group"><label>公司名称 *</label><input type="text" id="lead-company" placeholder="公司名称"></div>
+      <div class="form-group"><label>联系人 *</label><input type="text" id="lead-contact" placeholder="联系人姓名"></div>
+      <div class="form-group"><label>联系电话</label><input type="tel" id="lead-phone" placeholder="手机/电话"></div>
+      <div class="form-group"><label>线索来源</label><select id="lead-source"></select></div>
+      <div class="form-group"><label>负责人</label><select id="lead-owner"></select></div>
+      <div class="form-group"><label>下次跟进时间</label><input type="date" id="lead-nextfollow"></div>
+      <div class="form-group full-width"><label>初步需求/备注</label><textarea id="lead-note" placeholder="客户初步需求描述..." rows="3"></textarea></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('addLeadModal')">取消</button>
+    <button class="btn btn-primary" onclick="saveLead()">保存线索</button>
+  </div>
+</div>
+
+<!-- ===== 模态框：新增客户 ===== -->
+<div class="modal" id="addCustomerModal">
+  <div class="modal-header"><h3>新增客户</h3><button onclick="closeModal('addCustomerModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body">
+    <div class="form-grid">
+      <div class="form-group"><label>公司名称 *</label><input type="text" id="cust-company" placeholder="公司全称"></div>
+      <div class="form-group"><label>联系人 *</label><input type="text" id="cust-contact" placeholder="主要联系人"></div>
+      <div class="form-group"><label>联系电话 *</label><input type="tel" id="cust-phone" placeholder="手机号码"></div>
+      <div class="form-group"><label>邮箱</label><input type="email" id="cust-email" placeholder="电子邮箱"></div>
+      <div class="form-group"><label>行业</label><select id="cust-industry"></select></div>
+      <div class="form-group"><label>客户等级</label>
+        <select id="cust-level"><option value="A">A级 - 重要客户</option><option value="B">B级 - 普通客户</option><option value="C">C级 - 观察客户</option></select>
+      </div>
+      <div class="form-group"><label>负责人</label><select id="cust-owner"></select></div>
+      <div class="form-group full-width"><label>公司地址</label><input type="text" id="cust-address" placeholder="公司地址"></div>
+      <div class="form-group full-width"><label>备注</label><textarea id="cust-note" placeholder="客户背景信息..." rows="3"></textarea></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('addCustomerModal')">取消</button>
+    <button class="btn btn-primary" onclick="saveCustomer()">保存客户</button>
+  </div>
+</div>
+
+<!-- ===== 模态框：新增商机 ===== -->
+<div class="modal" id="addOppModal">
+  <div class="modal-header"><h3>新增商机</h3><button onclick="closeModal('addOppModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body">
+    <div class="form-grid">
+      <div class="form-group"><label>商机名称 *</label><input type="text" id="opp-name" placeholder="如：XX公司MES系统项目"></div>
+      <div class="form-group"><label>关联客户</label><select id="opp-customer"><option value="">请选择客户</option></select></div>
+      <div class="form-group"><label>预计金额（万元）</label><input type="number" id="opp-amount" placeholder="预计合同金额"></div>
+      <div class="form-group"><label>阶段</label>
+        <select id="opp-stage">
+          <option value="needs_analysis">需求分析</option><option value="proposal">方案提交</option>
+          <option value="negotiation">商务谈判</option><option value="won">成交</option><option value="lost">失败</option>
+        </select>
+      </div>
+      <div class="form-group"><label>负责人</label><select id="opp-owner"></select></div>
+      <div class="form-group"><label>预计成交日期</label><input type="date" id="opp-closedate"></div>
+    </div>
+    <div class="needs-section">
+      <h4>需求与产品预留</h4>
+      <div id="needsList">
+        <div class="need-item">
+          <input type="text" placeholder="需求描述（如：MES系统）" class="need-desc">
+          <select class="need-product"></select>
+          <input type="number" placeholder="预估金额(万)" class="need-amount">
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="addNeedItem()"><i class="fas fa-plus"></i> 添加需求</button>
+    </div>
+    <div class="form-group full-width mt-16"><label>备注</label><textarea id="opp-note" placeholder="商机详情..." rows="3"></textarea></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('addOppModal')">取消</button>
+    <button class="btn btn-primary" onclick="saveOpportunity()">保存商机</button>
+  </div>
+</div>
+
+<!-- ===== 模态框：上传合同 ===== -->
+<div class="modal" id="addContractModal">
+  <div class="modal-header"><h3>上传合同</h3><button onclick="closeModal('addContractModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body">
+    <div class="form-grid">
+      <div class="form-group"><label>合同编号 *</label><input type="text" id="contract-no" placeholder="如：HT-2026-001"></div>
+      <div class="form-group"><label>关联客户 *</label><select id="contract-customer"><option value="">请选择客户</option></select></div>
+      <div class="form-group"><label>合同金额（万元）*</label><input type="number" id="contract-amount" placeholder="合同金额"></div>
+      <div class="form-group"><label>签署日期</label><input type="date" id="contract-date"></div>
+      <div class="form-group"><label>合同状态</label>
+        <select id="contract-status"><option value="active">执行中</option><option value="completed">已完成</option><option value="pending">待审核</option></select>
+      </div>
+      <div class="form-group"><label>负责人</label><select id="contract-owner"></select></div>
+      <div class="form-group full-width">
+        <label>合同文件</label>
+        <div class="file-upload-area" onclick="document.getElementById('contractFile').click()">
+          <i class="fas fa-file-upload"></i><span>点击上传合同文件（PDF/Word）</span>
+          <input type="file" id="contractFile" accept=".pdf,.doc,.docx" style="display:none">
+        </div>
+        <div id="contractFileName" class="file-name-display"></div>
+      </div>
+      <div class="form-group full-width"><label>备注</label><textarea id="contract-note" placeholder="合同相关备注..." rows="3"></textarea></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('addContractModal')">取消</button>
+    <button class="btn btn-primary" onclick="saveContract()">保存合同</button>
+  </div>
+</div>
+
+<!-- ===== 模态框：新建项目 ===== -->
+<div class="modal" id="addProjectModal">
+  <div class="modal-header"><h3>新建实施项目</h3><button onclick="closeModal('addProjectModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body">
+    <div class="form-grid">
+      <div class="form-group"><label>项目名称 *</label><input type="text" id="proj-name" placeholder="项目名称"></div>
+      <div class="form-group"><label>关联客户</label><select id="proj-customer"><option value="">请选择客户</option></select></div>
+      <div class="form-group"><label>项目状态</label>
+        <select id="proj-status"><option value="preparing">筹备中</option><option value="implementing">实施中</option><option value="testing">测试验收</option><option value="completed">已完成</option></select>
+      </div>
+      <div class="form-group"><label>负责人</label><select id="proj-owner"></select></div>
+      <div class="form-group"><label>开始日期</label><input type="date" id="proj-start"></div>
+      <div class="form-group"><label>预计完成日期</label><input type="date" id="proj-end"></div>
+      <div class="form-group full-width"><label>项目描述</label><textarea id="proj-desc" placeholder="项目内容描述..." rows="3"></textarea></div>
+    </div>
+    <div class="milestone-section">
+      <h4>里程碑计划</h4>
+      <div id="milestoneList">
+        <div class="milestone-item">
+          <input type="text" placeholder="里程碑名称（如：系统上线）" class="milestone-name">
+          <input type="date" class="milestone-date">
+          <select class="milestone-status"><option value="pending">待完成</option><option value="done">已完成</option></select>
+        </div>
+      </div>
+      <button class="btn btn-outline btn-sm" onclick="addMilestone()"><i class="fas fa-plus"></i> 添加里程碑</button>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('addProjectModal')">取消</button>
+    <button class="btn btn-primary" onclick="saveProject()">保存项目</button>
+  </div>
+</div>
+
+<!-- ===== 模态框：新增跟进（含语音录入）===== -->
+<div class="modal" id="addFollowupModal">
+  <div class="modal-header"><h3>新增跟进记录</h3><button onclick="closeModal('addFollowupModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body">
+    <div class="form-grid">
+      <div class="form-group"><label>关联客户/线索 *</label><select id="followup-customer"><option value="">请选择</option></select></div>
+      <div class="form-group"><label>跟进方式</label><select id="followup-type"></select></div>
+      <div class="form-group"><label>下次跟进时间 *</label><input type="date" id="followup-nextdate"></div>
+      <div class="form-group"><label>优先级</label>
+        <select id="followup-priority"><option value="high">高 - 重点跟进</option><option value="medium" selected>中 - 正常跟进</option><option value="low">低 - 定期维护</option></select>
+      </div>
+      <div class="form-group full-width">
+        <label>本次跟进内容
+          <button type="button" class="voice-btn" id="voiceBtn" onclick="toggleVoice()" title="点击语音录入">
+            <i class="fas fa-microphone"></i><span class="voice-btn-text">语音录入</span>
+          </button>
+        </label>
+        <div class="voice-status" id="voiceStatus"></div>
+        <textarea id="followup-content" placeholder="记录本次沟通内容、客户反馈等（可点击上方麦克风语音输入）..." rows="4"></textarea>
+      </div>
+      <div class="form-group full-width"><label>下次跟进目标</label><input type="text" id="followup-goal" placeholder="下次沟通想达成的目标..."></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('addFollowupModal')">取消</button>
+    <button class="btn btn-primary" onclick="saveFollowup()">保存记录</button>
+  </div>
+</div>
+
+<!-- ===== 模态框：制定维护计划 ===== -->
+<div class="modal" id="addMaintenanceModal">
+  <div class="modal-header"><h3>制定老客户维护计划</h3><button onclick="closeModal('addMaintenanceModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body">
+    <div class="form-grid">
+      <div class="form-group"><label>选择客户 *</label><select id="maint-customer"><option value="">请选择老客户</option></select></div>
+      <div class="form-group"><label>维护频率</label>
+        <select id="maint-frequency"><option value="weekly">每周一次</option><option value="biweekly">每两周一次</option><option value="monthly">每月一次</option><option value="quarterly">每季度一次</option></select>
+      </div>
+      <div class="form-group"><label>维护方式</label><select id="maint-type"></select></div>
+      <div class="form-group"><label>负责人</label><select id="maint-owner"></select></div>
+      <div class="form-group full-width"><label>维护目标</label><textarea id="maint-goal" placeholder="维护目的，如：了解使用情况、挖掘二次需求等..." rows="3"></textarea></div>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('addMaintenanceModal')">取消</button>
+    <button class="btn btn-primary" onclick="saveMaintenance()">保存计划</button>
+  </div>
+</div>
+
+<!-- ===== 通用详情模态框 ===== -->
+<div class="modal modal-lg" id="detailModal">
+  <div class="modal-header"><h3 id="detailTitle">详情</h3><button onclick="closeModal('detailModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body" id="detailContent"></div>
+  <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('detailModal')">关闭</button></div>
+</div>
+
+<!-- Toast提示 -->
+<div id="toast" class="toast"></div>
+
+<script>
+// 登录密码验证
+const LOGIN_PASSWORD = 'crm888'; // 默认密码，部署后可以修改
+
+function checkLogin() {
+  const input = document.getElementById('loginPassword').value;
+  if (input === LOGIN_PASSWORD) {
+    document.getElementById('loginOverlay').style.display = 'none';
+    sessionStorage.setItem('crm_logged_in', 'true');
+  } else {
+    showToast('密码错误，请重试', 'error');
+    document.getElementById('loginPassword').value = '';
+  }
+}
+
+// 检查是否已登录
+if (sessionStorage.getItem('crm_logged_in') === 'true') {
+  document.getElementById('loginOverlay').style.display = 'none';
+}
+</script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1285 @@
+// ============ 数据存储 ============
+const DB = {
+  get(key) { try { return JSON.parse(localStorage.getItem('crm_' + key) || 'null') || []; } catch { return []; } },
+  getObj(key, def) { try { return JSON.parse(localStorage.getItem('crm_' + key) || 'null') || def; } catch { return def; } },
+  set(key, data) { localStorage.setItem('crm_' + key, JSON.stringify(data)); },
+  genId() { return Date.now().toString(36) + Math.random().toString(36).substr(2, 5); }
+};
+
+// ============ 系统设置（可自定义下拉选项）============
+const DEFAULT_SETTINGS = {
+  owners: ['张三', '李四', '王五', '赵六', '管理员'],
+  industries: ['制造业', '汽车行业', '电子行业', '食品行业', '医药行业', '化工行业', '物流行业', '其他'],
+  sources: ['展会获取', '老客户推荐', '网络询盘', '陌生拜访', '名片录入', '其他'],
+  products: ['MES系统', '自动化产线', 'SCADA系统', 'WMS系统', '定制开发'],
+  followupTypes: ['电话沟通', '拜访客户', '发送邮件', '微信沟通', '视频会议'],
+  maintTypes: ['电话问候', '上门拜访', '发送资料', '节日祝福', '满意度回访']
+};
+
+function getSettings() {
+  return DB.getObj('settings', DEFAULT_SETTINGS);
+}
+
+function saveSettings(settings) {
+  DB.set('settings', settings);
+}
+
+// 刷新设置页面列表
+function renderSettings() {
+  const s = getSettings();
+  const keys = ['owners', 'industries', 'sources', 'products', 'followupTypes'];
+  const listIds = ['ownersList', 'industriesList', 'sourcesList', 'productsList', 'followupTypesList'];
+  keys.forEach((key, i) => {
+    const el = document.getElementById(listIds[i]);
+    if (!el) return;
+    el.innerHTML = (s[key] || []).map((item, idx) =>
+      `<div class="settings-tag">
+        <span>${item}</span>
+        <button onclick="removeSettingItem('${key}',${idx})" title="删除"><i class="fas fa-times"></i></button>
+      </div>`
+    ).join('');
+  });
+}
+
+function addSettingItem(key) {
+  const inputMap = { owners:'newOwnerInput', industries:'newIndustryInput', sources:'newSourceInput', products:'newProductInput', followupTypes:'newFollowupTypeInput' };
+  const input = document.getElementById(inputMap[key]);
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) { showToast('请输入内容', 'error'); return; }
+  const s = getSettings();
+  if (!s[key]) s[key] = [];
+  if (s[key].includes(val)) { showToast('已存在相同选项', 'error'); return; }
+  s[key].push(val);
+  saveSettings(s);
+  input.value = '';
+  renderSettings();
+  showToast('添加成功');
+}
+
+function removeSettingItem(key, idx) {
+  const s = getSettings();
+  if (!s[key]) return;
+  s[key].splice(idx, 1);
+  saveSettings(s);
+  renderSettings();
+  showToast('已删除');
+}
+
+// 填充某个 <select> 元素
+function fillSelect(elId, items, addEmpty) {
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const prefix = addEmpty ? `<option value="">请选择</option>` : '';
+  el.innerHTML = prefix + items.map(i => `<option value="${i}">${i}</option>`).join('');
+}
+
+// 刷新所有动态下拉框
+function refreshAllSelects() {
+  const s = getSettings();
+  // 负责人
+  ['lead-owner','cust-owner','opp-owner','contract-owner','proj-owner','maint-owner'].forEach(id => fillSelect(id, s.owners || []));
+  // 行业
+  ['cust-industry','card-industry'].forEach(id => fillSelect(id, s.industries || [], true));
+  // 来源
+  fillSelect('lead-source', s.sources || []);
+  // 跟进方式
+  fillSelect('followup-type', s.followupTypes || []);
+  // 维护方式
+  fillSelect('maint-type', s.maintTypes || []);
+}
+
+// 刷新商机模态框中的产品下拉（包含动态添加行）
+function refreshProductSelects() {
+  const s = getSettings();
+  const opts = `<option value="">关联产品/方案</option>` + (s.products || []).map(p => `<option>${p}</option>`).join('');
+  document.querySelectorAll('.need-product').forEach(el => el.innerHTML = opts);
+}
+
+// ============ 工具函数 ============
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + type + ' show';
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+function formatDate(str) {
+  if (!str) return '-';
+  const d = new Date(str);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function daysDiff(dateStr) {
+  if (!dateStr) return null;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const d = new Date(dateStr); d.setHours(0,0,0,0);
+  return Math.floor((d - now) / 86400000);
+}
+
+function getStageLabel(stage) {
+  const map = { needs_analysis:'需求分析', proposal:'方案提交', negotiation:'商务谈判', won:'成交', lost:'失败' };
+  return map[stage] || stage;
+}
+
+function getStatusTag(status) {
+  const map = {
+    active: '<span class="tag tag-green">执行中</span>',
+    completed: '<span class="tag tag-gray">已完成</span>',
+    pending: '<span class="tag tag-orange">待审核</span>',
+    preparing: '<span class="tag tag-purple">筹备中</span>',
+    implementing: '<span class="tag tag-blue">实施中</span>',
+    testing: '<span class="tag tag-orange">测试验收</span>'
+  };
+  return map[status] || `<span class="tag tag-gray">${status}</span>`;
+}
+
+function getLevelTag(level) {
+  const map = { A:'<span class="tag tag-red">A级</span>', B:'<span class="tag tag-blue">B级</span>', C:'<span class="tag tag-gray">C级</span>' };
+  return map[level] || level;
+}
+
+// ============ 导航 ============
+const pageTitles = {
+  dashboard:'工作台', leads:'线索管理', customers:'客户管理',
+  opportunities:'商机管理', contracts:'合同管理', projects:'项目实施',
+  followup:'跟进提醒', maintenance:'客户维护', card:'名片录入', settings:'系统设置'
+};
+
+function navigateTo(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const target = document.getElementById('page-' + page);
+  if (target) target.classList.add('active');
+  const navItem = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (navItem) navItem.classList.add('active');
+  document.getElementById('pageTitle').textContent = pageTitles[page] || page;
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('overlay').classList.remove('active');
+  renderPage(page);
+}
+
+function renderPage(page) {
+  switch(page) {
+    case 'dashboard': renderDashboard(); break;
+    case 'leads': renderLeads(); break;
+    case 'customers': renderCustomers(); break;
+    case 'opportunities': renderOpportunities(); break;
+    case 'contracts': renderContracts(); break;
+    case 'projects': renderProjects(); break;
+    case 'followup': renderFollowup(); break;
+    case 'maintenance': renderMaintenance(); break;
+    case 'settings': renderSettings(); break;
+  }
+}
+
+// ============ 模态框控制 ============
+function openModal(id) {
+  refreshAllSelects();
+  refreshProductSelects();
+  if (['addOppModal','addContractModal','addProjectModal','addFollowupModal','addMaintenanceModal'].includes(id)) {
+    refreshCustomerSelects();
+  }
+  document.getElementById(id).classList.add('active');
+  document.getElementById('overlay').classList.add('active');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+  // 只有无其他弹窗时才关遮罩
+  const anyOpen = document.querySelectorAll('.modal.active').length > 0;
+  if (!anyOpen) document.getElementById('overlay').classList.remove('active');
+  // 停止语音
+  if (id === 'addFollowupModal') stopVoice();
+}
+
+function closeAllModals() {
+  document.querySelectorAll('.modal').forEach(m => m.classList.remove('active'));
+  document.getElementById('overlay').classList.remove('active');
+  stopVoice();
+}
+
+function refreshCustomerSelects() {
+  const customers = DB.get('customers');
+  const leads = DB.get('leads');
+  const allOptions = [
+    ...customers.map(c => `<option value="cust_${c.id}">${c.company}（${c.contact}）</option>`),
+    ...leads.map(l => `<option value="lead_${l.id}">[线索] ${l.company}（${l.contact}）</option>`)
+  ].join('');
+  const custOnly = customers.map(c => `<option value="${c.id}">${c.company}</option>`).join('');
+  ['opp-customer','followup-customer','maint-customer'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<option value="">请选择</option>` + allOptions;
+  });
+  ['contract-customer','proj-customer'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<option value="">请选择客户</option>` + custOnly;
+  });
+}
+
+// ============ 工作台 ============
+function renderDashboard() {
+  const leads = DB.get('leads');
+  const opps = DB.get('opportunities');
+  const contracts = DB.get('contracts');
+  const followups = DB.get('followups');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const thisMonth = today.getMonth(), thisYear = today.getFullYear();
+
+  document.getElementById('stat-leads').textContent = leads.filter(l => l.status !== 'converted').length;
+  document.getElementById('stat-opps').textContent = opps.filter(o => o.stage !== 'won' && o.stage !== 'lost').length;
+
+  const monthContracts = contracts.filter(c => {
+    if (!c.date) return false;
+    const d = new Date(c.date);
+    return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+  });
+  document.getElementById('stat-contracts').textContent = monthContracts.length;
+
+  const todayFollowups = followups.filter(f => {
+    if (!f.nextdate) return false;
+    const d = new Date(f.nextdate); d.setHours(0,0,0,0);
+    return d <= today;
+  });
+  document.getElementById('stat-reminders').textContent = todayFollowups.length;
+  document.getElementById('followupBadge').textContent = todayFollowups.length;
+
+  // 漏斗
+  document.getElementById('funnel-leads').textContent = leads.length;
+  document.getElementById('funnel-opps').textContent = opps.length;
+  document.getElementById('funnel-needs').textContent = opps.filter(o => ['proposal','negotiation','won'].includes(o.stage)).length;
+  document.getElementById('funnel-contracts').textContent = contracts.length;
+
+  // 金额汇总
+  const sumOpps = opps.reduce((acc, o) => acc + (parseFloat(o.amount) || 0), 0);
+  const sumOppsActive = opps.filter(o => !['won','lost'].includes(o.stage)).reduce((acc, o) => acc + (parseFloat(o.amount) || 0), 0);
+  const sumContractsMonth = monthContracts.reduce((acc, c) => acc + (parseFloat(c.amount) || 0), 0);
+  const sumContractsTotal = contracts.reduce((acc, c) => acc + (parseFloat(c.amount) || 0), 0);
+  document.getElementById('sum-opps').textContent = `¥${sumOpps.toFixed(1)}万`;
+  document.getElementById('sum-opps-active').textContent = `¥${sumOppsActive.toFixed(1)}万`;
+  document.getElementById('sum-contracts-month').textContent = `¥${sumContractsMonth.toFixed(1)}万`;
+  document.getElementById('sum-contracts-total').textContent = `¥${sumContractsTotal.toFixed(1)}万`;
+
+  // 今日待办
+  const el = document.getElementById('todayTasks');
+  if (todayFollowups.length === 0) {
+    el.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i> 今日暂无待跟进</div>';
+  } else {
+    el.innerHTML = todayFollowups.slice(0, 6).map(f => {
+      const diff = daysDiff(f.nextdate);
+      const dateText = diff < 0 ? `逾期${Math.abs(diff)}天` : (diff === 0 ? '今天' : `${diff}天后`);
+      const dotClass = f.priority === 'high' ? 'high' : (f.priority === 'low' ? 'low' : 'medium');
+      return `<div class="task-item" onclick="navigateTo('followup')">
+        <div class="task-dot ${dotClass}"></div>
+        <div class="task-info">
+          <div class="task-name">${f.customerName || '未知客户'}</div>
+          <div class="task-meta">${f.type} · ${f.goal || '持续跟进'}</div>
+        </div>
+        <div class="task-date" style="color:${diff<=0?'#f44336':'#888'}">${dateText}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // 最近动态
+  const activities = DB.get('activities');
+  const actEl = document.getElementById('recentActivities');
+  if (activities.length === 0) {
+    actEl.innerHTML = '<div class="empty-state"><i class="fas fa-info-circle"></i> 暂无动态记录</div>';
+  } else {
+    actEl.innerHTML = activities.slice(-10).reverse().map(a =>
+      `<div class="activity-item">
+        <div class="activity-icon"><i class="${a.icon}"></i></div>
+        <div class="activity-content">
+          <div class="activity-text">${a.text}</div>
+          <div class="activity-time">${a.time}</div>
+        </div>
+      </div>`
+    ).join('');
+  }
+}
+
+function addActivity(text, icon = 'fas fa-info-circle') {
+  const activities = DB.get('activities');
+  activities.push({ text, icon, time: new Date().toLocaleString('zh-CN') });
+  if (activities.length > 60) activities.shift();
+  DB.set('activities', activities);
+}
+
+// ============ 线索管理 ============
+function renderLeads() {
+  const leads = DB.get('leads');
+  const tbody = document.getElementById('leadsTableBody');
+  if (leads.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="empty-row">暂无线索数据，点击"新增线索"开始</td></tr>'; return; }
+  tbody.innerHTML = leads.map(l => {
+    const diff = l.nextfollow ? daysDiff(l.nextfollow) : null;
+    const dateText = diff === null ? '-' : diff < 0
+      ? `<span style="color:#f44336">逾期${Math.abs(diff)}天</span>`
+      : diff === 0 ? '<span style="color:#ff9800">今天</span>' : formatDate(l.nextfollow);
+    return `<tr>
+      <td><strong style="cursor:pointer;color:#1a237e" onclick="viewLeadDetail('${l.id}')">${l.company}</strong></td>
+      <td>${l.contact}</td>
+      <td><span class="tag tag-blue">${l.source}</span></td>
+      <td>${l.status === 'converted' ? '<span class="tag tag-green">已转化</span>' : '<span class="tag tag-orange">跟进中</span>'}</td>
+      <td>${l.owner}</td>
+      <td>${dateText}</td>
+      <td>
+        <button class="action-btn view" onclick="viewLeadDetail('${l.id}')"><i class="fas fa-eye"></i></button>
+        <button class="action-btn followup" onclick="quickFollowup('${l.company}','lead_${l.id}')"><i class="fas fa-bell"></i></button>
+        <button class="action-btn del" onclick="deleteLead('${l.id}')"><i class="fas fa-trash"></i></button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function saveLead() {
+  const company = document.getElementById('lead-company').value.trim();
+  const contact = document.getElementById('lead-contact').value.trim();
+  if (!company || !contact) { showToast('请填写公司名称和联系人', 'error'); return; }
+  const lead = {
+    id: DB.genId(), company, contact,
+    phone: document.getElementById('lead-phone').value,
+    source: document.getElementById('lead-source').value,
+    owner: document.getElementById('lead-owner').value,
+    nextfollow: document.getElementById('lead-nextfollow').value,
+    note: document.getElementById('lead-note').value,
+    status: 'active', createdAt: new Date().toISOString()
+  };
+  const leads = DB.get('leads'); leads.push(lead); DB.set('leads', leads);
+  addActivity(`新增线索：${company}（${contact}）`, 'fas fa-user-plus');
+  closeModal('addLeadModal');
+  ['lead-company','lead-contact','lead-phone','lead-nextfollow','lead-note'].forEach(id => document.getElementById(id).value = '');
+  showToast('线索保存成功！');
+  renderPage('leads');
+}
+
+function deleteLead(id) {
+  if (!confirm('确认删除此线索？')) return;
+  DB.set('leads', DB.get('leads').filter(l => l.id !== id));
+  showToast('已删除'); renderPage('leads');
+}
+
+function viewLeadDetail(id) {
+  const lead = DB.get('leads').find(l => l.id === id);
+  if (!lead) return;
+  const followups = DB.get('followups').filter(f => f.customerId === `lead_${id}`);
+  document.getElementById('detailTitle').textContent = `线索详情：${lead.company}`;
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-section">
+      <h4>基本信息</h4>
+      <div class="detail-grid">
+        <div class="detail-item"><label>公司名称</label><span>${lead.company}</span></div>
+        <div class="detail-item"><label>联系人</label><span>${lead.contact}</span></div>
+        <div class="detail-item"><label>电话</label><span>${lead.phone ? `<a href="tel:${lead.phone}" style="color:#1976d2">${lead.phone}</a>` : '-'}</span></div>
+        <div class="detail-item"><label>来源</label><span>${lead.source}</span></div>
+        <div class="detail-item"><label>负责人</label><span>${lead.owner}</span></div>
+        <div class="detail-item"><label>下次跟进</label><span>${formatDate(lead.nextfollow)}</span></div>
+        ${lead.note ? `<div class="detail-item" style="grid-column:1/-1"><label>备注</label><span>${lead.note}</span></div>` : ''}
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>跟进记录（${followups.length}条）</h4>
+      <div class="followup-history">
+        ${followups.length === 0 ? '<div class="empty-state" style="padding:16px"><i class="fas fa-comments"></i> 暂无跟进记录</div>' :
+          followups.slice().reverse().map(f => `
+            <div class="followup-history-item">
+              <div class="fhi-header"><span>${f.type}</span><span>${f.createdAt ? new Date(f.createdAt).toLocaleString('zh-CN') : ''}</span></div>
+              <div class="fhi-content">${f.content || '（无内容）'}</div>
+              ${f.goal ? `<div style="color:#1976d2;font-size:12px;margin-top:4px">目标：${f.goal}</div>` : ''}
+            </div>`).join('')}
+      </div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-primary btn-sm" onclick="quickFollowup('${lead.company}','lead_${id}');closeModal('detailModal')"><i class="fas fa-plus"></i> 新增跟进</button>
+      <button class="btn btn-success btn-sm" onclick="convertLeadToCustomer('${id}');closeModal('detailModal')"><i class="fas fa-arrow-right"></i> 转为客户</button>
+    </div>`;
+  openModal('detailModal');
+}
+
+function convertLeadToCustomer(id) {
+  const leads = DB.get('leads');
+  const lead = leads.find(l => l.id === id);
+  if (!lead) return;
+  const customer = {
+    id: DB.genId(), company: lead.company, contact: lead.contact,
+    phone: lead.phone || '', email: '', industry: '其他', level: 'B',
+    owner: lead.owner, address: '', note: lead.note || '',
+    createdAt: new Date().toISOString()
+  };
+  const customers = DB.get('customers'); customers.push(customer); DB.set('customers', customers);
+  lead.status = 'converted'; DB.set('leads', leads);
+  addActivity(`线索转化为客户：${lead.company}`, 'fas fa-exchange-alt');
+  showToast(`${lead.company} 已转为客户！`);
+  renderPage('leads');
+}
+
+// ============ 客户管理 ============
+function renderCustomers() {
+  const customers = DB.get('customers');
+  const tbody = document.getElementById('customersTableBody');
+  if (customers.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="empty-row">暂无客户数据</td></tr>'; return; }
+  tbody.innerHTML = customers.map(c => `<tr>
+    <td><strong style="cursor:pointer;color:#1a237e" onclick="viewCustomerDetail('${c.id}')">${c.company}</strong></td>
+    <td>${c.contact}</td>
+    <td>${c.phone ? `<a href="tel:${c.phone}" style="color:#1976d2">${c.phone}</a>` : '-'}</td>
+    <td>${c.industry}</td>
+    <td>${getLevelTag(c.level)}</td>
+    <td>${c.owner}</td>
+    <td>
+      <button class="action-btn view" onclick="viewCustomerDetail('${c.id}')"><i class="fas fa-eye"></i></button>
+      <button class="action-btn followup" onclick="quickFollowup('${c.company}','cust_${c.id}')"><i class="fas fa-bell"></i></button>
+      <button class="action-btn del" onclick="deleteCustomer('${c.id}')"><i class="fas fa-trash"></i></button>
+    </td>
+  </tr>`).join('');
+}
+
+function saveCustomer() {
+  const company = document.getElementById('cust-company').value.trim();
+  const contact = document.getElementById('cust-contact').value.trim();
+  const phone = document.getElementById('cust-phone').value.trim();
+  if (!company || !contact || !phone) { showToast('请填写公司名称、联系人和联系电话', 'error'); return; }
+  const customer = {
+    id: DB.genId(), company, contact, phone,
+    email: document.getElementById('cust-email').value,
+    industry: document.getElementById('cust-industry').value,
+    level: document.getElementById('cust-level').value,
+    owner: document.getElementById('cust-owner').value,
+    address: document.getElementById('cust-address').value,
+    note: document.getElementById('cust-note').value,
+    createdAt: new Date().toISOString()
+  };
+  const customers = DB.get('customers'); customers.push(customer); DB.set('customers', customers);
+  addActivity(`新增客户：${company}（${customer.level}级）`, 'fas fa-users');
+  closeModal('addCustomerModal');
+  ['cust-company','cust-contact','cust-phone','cust-email','cust-address','cust-note'].forEach(id => document.getElementById(id).value = '');
+  showToast('客户保存成功！'); renderPage('customers');
+}
+
+function deleteCustomer(id) {
+  if (!confirm('确认删除此客户？')) return;
+  DB.set('customers', DB.get('customers').filter(c => c.id !== id));
+  showToast('已删除'); renderPage('customers');
+}
+
+function viewCustomerDetail(id) {
+  const c = DB.get('customers').find(c => c.id === id);
+  if (!c) return;
+  const followups = DB.get('followups').filter(f => f.customerId === `cust_${id}`);
+  const opps = DB.get('opportunities').filter(o => o.customerId === id || o.customerId === `cust_${id}`);
+  document.getElementById('detailTitle').textContent = `客户详情：${c.company}`;
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-section">
+      <h4>基本信息</h4>
+      <div class="detail-grid">
+        <div class="detail-item"><label>公司名称</label><span>${c.company}</span></div>
+        <div class="detail-item"><label>联系人</label><span>${c.contact}</span></div>
+        <div class="detail-item"><label>电话</label><span>${c.phone ? `<a href="tel:${c.phone}" style="color:#1976d2">${c.phone}</a>` : '-'}</span></div>
+        <div class="detail-item"><label>邮箱</label><span>${c.email || '-'}</span></div>
+        <div class="detail-item"><label>行业</label><span>${c.industry}</span></div>
+        <div class="detail-item"><label>客户等级</label>${getLevelTag(c.level)}</div>
+        <div class="detail-item"><label>负责人</label><span>${c.owner}</span></div>
+        <div class="detail-item"><label>地址</label><span>${c.address || '-'}</span></div>
+        ${c.note ? `<div class="detail-item" style="grid-column:1/-1"><label>备注</label><span>${c.note}</span></div>` : ''}
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>关联商机（${opps.length}个）</h4>
+      ${opps.length === 0 ? '<div style="color:#bbb;font-size:13px;padding:4px 0">暂无商机</div>' :
+        opps.map(o => `<div style="background:#f8f9ff;border-radius:8px;padding:10px;margin-bottom:6px;cursor:pointer" onclick="closeModal('detailModal');viewOppDetail('${o.id}')">
+          <strong>${o.name}</strong> · ${getStageLabel(o.stage)} · 
+          <span style="color:#388e3c">${o.amount ? '¥'+o.amount+'万' : '金额待定'}</span>
+        </div>`).join('')}
+    </div>
+    <div class="detail-section">
+      <h4>跟进记录（${followups.length}条）</h4>
+      <div class="followup-history">
+        ${followups.length === 0 ? '<div style="color:#bbb;font-size:13px;padding:4px 0">暂无跟进记录</div>' :
+          followups.slice().reverse().slice(0,5).map(f => `
+            <div class="followup-history-item">
+              <div class="fhi-header"><span>${f.type}</span><span>${f.createdAt ? new Date(f.createdAt).toLocaleString('zh-CN') : ''}</span></div>
+              <div class="fhi-content">${f.content || '（无内容）'}</div>
+            </div>`).join('')}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-outline btn-sm" onclick="quickFollowup('${c.company}','cust_${id}');closeModal('detailModal')"><i class="fas fa-bell"></i> 新增跟进</button>
+      <button class="btn btn-primary btn-sm" onclick="closeModal('detailModal');openModal('addOppModal')"><i class="fas fa-fire"></i> 新增商机</button>
+    </div>`;
+  openModal('detailModal');
+}
+
+// ============ 商机管理 ============
+function renderOpportunities() {
+  const opps = DB.get('opportunities');
+  ['needs_analysis','proposal','negotiation','won','lost'].forEach(stage => {
+    const container = document.getElementById('kanban-' + stage);
+    if (!container) return;
+    const stageOpps = opps.filter(o => o.stage === stage);
+    container.innerHTML = stageOpps.length === 0
+      ? '<div style="text-align:center;padding:16px;color:#ccc;font-size:12px">暂无</div>'
+      : stageOpps.map(o => `
+        <div class="kanban-card" onclick="viewOppDetail('${o.id}')">
+          <div class="kanban-card-title">${o.name}</div>
+          <div class="kanban-card-meta">${o.customerName || '未关联客户'} · ${o.owner}</div>
+          ${o.amount ? `<div class="kanban-card-amount">¥${o.amount}万</div>` : ''}
+          ${o.closedate ? `<div class="kanban-card-meta" style="margin-top:4px"><i class="fas fa-calendar" style="font-size:10px"></i> ${formatDate(o.closedate)}</div>` : ''}
+        </div>`).join('');
+  });
+}
+
+function addNeedItem() {
+  const list = document.getElementById('needsList');
+  const s = getSettings();
+  const opts = `<option value="">关联产品/方案</option>` + (s.products || []).map(p => `<option>${p}</option>`).join('');
+  const div = document.createElement('div');
+  div.className = 'need-item';
+  div.innerHTML = `<input type="text" placeholder="需求描述" class="need-desc">
+    <select class="need-product">${opts}</select>
+    <input type="number" placeholder="预估金额(万)" class="need-amount">`;
+  list.appendChild(div);
+}
+
+function saveOpportunity() {
+  const name = document.getElementById('opp-name').value.trim();
+  if (!name) { showToast('请填写商机名称', 'error'); return; }
+  const custVal = document.getElementById('opp-customer').value;
+  let customerName = '';
+  if (custVal) {
+    const custId = custVal.replace('cust_','').replace('lead_','');
+    const found = [...DB.get('customers'), ...DB.get('leads')].find(c => c.id === custId);
+    if (found) customerName = found.company;
+  }
+  const needs = [];
+  document.querySelectorAll('#needsList .need-item').forEach(item => {
+    const desc = item.querySelector('.need-desc').value;
+    const product = item.querySelector('.need-product').value;
+    const amount = item.querySelector('.need-amount').value;
+    if (desc) needs.push({ desc, product, amount });
+  });
+  const opp = {
+    id: DB.genId(), name, customerId: custVal, customerName,
+    amount: document.getElementById('opp-amount').value,
+    stage: document.getElementById('opp-stage').value,
+    owner: document.getElementById('opp-owner').value,
+    closedate: document.getElementById('opp-closedate').value,
+    note: document.getElementById('opp-note').value,
+    needs, createdAt: new Date().toISOString()
+  };
+  const opps = DB.get('opportunities'); opps.push(opp); DB.set('opportunities', opps);
+  addActivity(`新增商机：${name}（${getStageLabel(opp.stage)}）`, 'fas fa-fire');
+  closeModal('addOppModal');
+  ['opp-name','opp-amount','opp-closedate','opp-note'].forEach(id => document.getElementById(id).value = '');
+  const s = getSettings();
+  const defaultOpts = `<option value="">关联产品/方案</option>` + (s.products || []).map(p => `<option>${p}</option>`).join('');
+  document.getElementById('needsList').innerHTML = `<div class="need-item">
+    <input type="text" placeholder="需求描述" class="need-desc">
+    <select class="need-product">${defaultOpts}</select>
+    <input type="number" placeholder="预估金额(万)" class="need-amount">
+  </div>`;
+  showToast('商机保存成功！'); renderPage('opportunities');
+}
+
+function viewOppDetail(id) {
+  const opp = DB.get('opportunities').find(o => o.id === id);
+  if (!opp) return;
+  document.getElementById('detailTitle').textContent = `商机详情：${opp.name}`;
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-section">
+      <h4>商机信息</h4>
+      <div class="detail-grid">
+        <div class="detail-item"><label>商机名称</label><span>${opp.name}</span></div>
+        <div class="detail-item"><label>关联客户</label><span>${opp.customerName || '-'}</span></div>
+        <div class="detail-item"><label>阶段</label><span>${getStageLabel(opp.stage)}</span></div>
+        <div class="detail-item"><label>预计金额</label><span style="color:#388e3c;font-weight:600">${opp.amount ? '¥'+opp.amount+'万' : '-'}</span></div>
+        <div class="detail-item"><label>负责人</label><span>${opp.owner}</span></div>
+        <div class="detail-item"><label>预计成交日期</label><span>${formatDate(opp.closedate)}</span></div>
+      </div>
+    </div>
+    <div class="detail-section">
+      <h4>需求与产品（${(opp.needs||[]).length}项）</h4>
+      ${(opp.needs||[]).length === 0 ? '<div style="color:#bbb;font-size:13px">暂无需求记录</div>' :
+        `<table style="width:100%;font-size:13px;border-collapse:collapse">
+          <tr style="background:#f8f9ff"><th style="padding:8px;text-align:left">需求</th><th style="padding:8px;text-align:left">产品</th><th style="padding:8px;text-align:right">预估金额</th></tr>
+          ${opp.needs.map(n => `<tr style="border-top:1px solid #f0f0f0">
+            <td style="padding:8px">${n.desc}</td><td style="padding:8px">${n.product||'-'}</td>
+            <td style="padding:8px;text-align:right;color:#388e3c">${n.amount ? '¥'+n.amount+'万' : '-'}</td>
+          </tr>`).join('')}
+        </table>`}
+    </div>
+    ${opp.note ? `<div class="detail-section"><h4>备注</h4><p style="font-size:13px;color:#555">${opp.note}</p></div>` : ''}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+      ${opp.stage !== 'won' && opp.stage !== 'lost' ? `<button class="btn btn-primary btn-sm" onclick="moveOppStage('${opp.id}');closeModal('detailModal')"><i class="fas fa-arrow-right"></i> 推进阶段</button>` : ''}
+      <button class="btn btn-danger btn-sm" onclick="markOppLost('${opp.id}');closeModal('detailModal')"><i class="fas fa-times"></i> 标记失败</button>
+    </div>`;
+  openModal('detailModal');
+}
+
+function moveOppStage(id) {
+  const stageOrder = ['needs_analysis','proposal','negotiation','won'];
+  const opps = DB.get('opportunities');
+  const opp = opps.find(o => o.id === id);
+  if (!opp) return;
+  const idx = stageOrder.indexOf(opp.stage);
+  if (idx >= 0 && idx < stageOrder.length - 1) {
+    opp.stage = stageOrder[idx + 1];
+    DB.set('opportunities', opps);
+    addActivity(`商机推进：${opp.name} → ${getStageLabel(opp.stage)}`, 'fas fa-arrow-right');
+    showToast(`已推进到：${getStageLabel(opp.stage)}`);
+    renderPage('opportunities');
+  } else { showToast('已是最终阶段', 'error'); }
+}
+
+function markOppLost(id) {
+  const opps = DB.get('opportunities');
+  const opp = opps.find(o => o.id === id);
+  if (opp) { opp.stage = 'lost'; DB.set('opportunities', opps); addActivity(`商机失败：${opp.name}`, 'fas fa-times'); renderPage('opportunities'); }
+}
+
+// ============ 合同管理 ============
+function renderContracts() {
+  const contracts = DB.get('contracts');
+  const tbody = document.getElementById('contractsTableBody');
+  if (contracts.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="empty-row">暂无合同数据</td></tr>'; return; }
+  tbody.innerHTML = contracts.map(c => `<tr>
+    <td><strong>${c.no}</strong></td>
+    <td>${c.customerName || '-'}</td>
+    <td style="color:#388e3c;font-weight:600">¥${c.amount||0}万</td>
+    <td>${formatDate(c.date)}</td>
+    <td>${getStatusTag(c.status)}</td>
+    <td>${c.owner}</td>
+    <td>
+      <button class="action-btn view" onclick="viewContractDetail('${c.id}')"><i class="fas fa-eye"></i></button>
+      <button class="action-btn del" onclick="deleteContract('${c.id}')"><i class="fas fa-trash"></i></button>
+    </td>
+  </tr>`).join('');
+}
+
+function saveContract() {
+  const no = document.getElementById('contract-no').value.trim();
+  const amount = document.getElementById('contract-amount').value;
+  if (!no || !amount) { showToast('请填写合同编号和金额', 'error'); return; }
+  const custId = document.getElementById('contract-customer').value;
+  const found = DB.get('customers').find(c => c.id === custId);
+  const fileName = document.getElementById('contractFile').files[0]?.name || '';
+  const contract = {
+    id: DB.genId(), no, amount, customerId: custId,
+    customerName: found ? found.company : '',
+    date: document.getElementById('contract-date').value,
+    status: document.getElementById('contract-status').value,
+    owner: document.getElementById('contract-owner').value,
+    note: document.getElementById('contract-note').value,
+    fileName, createdAt: new Date().toISOString()
+  };
+  const contracts = DB.get('contracts'); contracts.push(contract); DB.set('contracts', contracts);
+  addActivity(`上传合同：${no}（¥${amount}万）`, 'fas fa-file-contract');
+  closeModal('addContractModal');
+  showToast('合同保存成功！'); renderPage('contracts');
+}
+
+function deleteContract(id) {
+  if (!confirm('确认删除此合同？')) return;
+  DB.set('contracts', DB.get('contracts').filter(c => c.id !== id));
+  showToast('已删除'); renderPage('contracts');
+}
+
+function viewContractDetail(id) {
+  const c = DB.get('contracts').find(c => c.id === id);
+  if (!c) return;
+  document.getElementById('detailTitle').textContent = `合同详情：${c.no}`;
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-section"><h4>合同信息</h4>
+      <div class="detail-grid">
+        <div class="detail-item"><label>合同编号</label><span>${c.no}</span></div>
+        <div class="detail-item"><label>客户名称</label><span>${c.customerName||'-'}</span></div>
+        <div class="detail-item"><label>合同金额</label><span style="color:#388e3c;font-weight:700">¥${c.amount}万</span></div>
+        <div class="detail-item"><label>签署日期</label><span>${formatDate(c.date)}</span></div>
+        <div class="detail-item"><label>合同状态</label>${getStatusTag(c.status)}</div>
+        <div class="detail-item"><label>负责人</label><span>${c.owner}</span></div>
+        <div class="detail-item"><label>附件</label><span>${c.fileName||'暂无附件'}</span></div>
+        ${c.note ? `<div class="detail-item" style="grid-column:1/-1"><label>备注</label><span>${c.note}</span></div>` : ''}
+      </div>
+    </div>`;
+  openModal('detailModal');
+}
+
+// ============ 项目实施 ============
+function renderProjects() {
+  const projects = DB.get('projects');
+  const container = document.getElementById('projectsList');
+  if (projects.length === 0) { container.innerHTML = '<div class="empty-state"><i class="fas fa-project-diagram"></i> 暂无项目</div>'; return; }
+  container.innerHTML = projects.map(p => {
+    const milestones = p.milestones || [];
+    const done = milestones.filter(m => m.status === 'done').length;
+    const pct = milestones.length > 0 ? Math.round(done / milestones.length * 100) : 0;
+    return `<div class="project-card">
+      <div class="project-card-header ${p.status||'implementing'}">
+        <div class="project-card-title">${p.name}</div>
+        <div class="project-card-customer"><i class="fas fa-building"></i> ${p.customerName||'未关联客户'}</div>
+      </div>
+      <div class="project-card-body">
+        <div class="project-progress">
+          <div class="progress-label"><span>进度</span><span>${done}/${milestones.length} 里程碑 · ${pct}%</span></div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        </div>
+        <div class="milestone-list-mini">
+          ${milestones.slice(0,4).map(m => `
+            <div class="milestone-mini">
+              <i class="fas ${m.status==='done'?'fa-check-circle done':'fa-circle pending'}"></i>
+              <span>${m.name}</span>
+              <span style="color:#bbb;font-size:11px;margin-left:auto">${formatDate(m.date)}</span>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+          <span style="font-size:12px;color:#888">${p.owner} · ${formatDate(p.start)}</span>
+          <button class="btn btn-outline btn-sm" onclick="viewProjectDetail('${p.id}')">查看详情</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addMilestone() {
+  const div = document.createElement('div');
+  div.className = 'milestone-item';
+  div.innerHTML = `<input type="text" placeholder="里程碑名称" class="milestone-name">
+    <input type="date" class="milestone-date">
+    <select class="milestone-status"><option value="pending">待完成</option><option value="done">已完成</option></select>`;
+  document.getElementById('milestoneList').appendChild(div);
+}
+
+function saveProject() {
+  const name = document.getElementById('proj-name').value.trim();
+  if (!name) { showToast('请填写项目名称', 'error'); return; }
+  const custId = document.getElementById('proj-customer').value;
+  const found = DB.get('customers').find(c => c.id === custId);
+  const milestones = [];
+  document.querySelectorAll('#milestoneList .milestone-item').forEach(item => {
+    const n = item.querySelector('.milestone-name').value;
+    if (n) milestones.push({ name:n, date:item.querySelector('.milestone-date').value, status:item.querySelector('.milestone-status').value });
+  });
+  const project = {
+    id: DB.genId(), name, customerId: custId, customerName: found ? found.company : '',
+    status: document.getElementById('proj-status').value,
+    owner: document.getElementById('proj-owner').value,
+    start: document.getElementById('proj-start').value,
+    end: document.getElementById('proj-end').value,
+    desc: document.getElementById('proj-desc').value,
+    milestones, createdAt: new Date().toISOString()
+  };
+  const projects = DB.get('projects'); projects.push(project); DB.set('projects', projects);
+  addActivity(`新建项目：${name}`, 'fas fa-tasks');
+  closeModal('addProjectModal');
+  showToast('项目创建成功！'); renderPage('projects');
+}
+
+function viewProjectDetail(id) {
+  const p = DB.get('projects').find(p => p.id === id);
+  if (!p) return;
+  const milestones = p.milestones || [];
+  document.getElementById('detailTitle').textContent = `项目详情：${p.name}`;
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detail-section"><h4>项目信息</h4>
+      <div class="detail-grid">
+        <div class="detail-item"><label>项目名称</label><span>${p.name}</span></div>
+        <div class="detail-item"><label>关联客户</label><span>${p.customerName||'-'}</span></div>
+        <div class="detail-item"><label>状态</label>${getStatusTag(p.status)}</div>
+        <div class="detail-item"><label>负责人</label><span>${p.owner}</span></div>
+        <div class="detail-item"><label>开始日期</label><span>${formatDate(p.start)}</span></div>
+        <div class="detail-item"><label>预计完成</label><span>${formatDate(p.end)}</span></div>
+      </div>
+    </div>
+    <div class="detail-section"><h4>里程碑（${milestones.length}个）</h4>
+      ${milestones.length === 0 ? '<div style="color:#bbb;font-size:13px">暂无里程碑</div>' :
+        milestones.map((m,i) => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px;background:${m.status==='done'?'#e8f5e9':'#f8f9ff'};border-radius:6px;margin-bottom:6px">
+            <i class="fas ${m.status==='done'?'fa-check-circle':'fa-circle'}" style="color:${m.status==='done'?'#388e3c':'#bbb'}"></i>
+            <span style="flex:1;font-size:13px">${m.name}</span>
+            <span style="font-size:12px;color:#888">${formatDate(m.date)}</span>
+            ${m.status!=='done' ? `<button class="btn btn-sm" style="padding:3px 8px;font-size:11px;background:#e8f5e9;color:#2e7d32;border:none;border-radius:4px;cursor:pointer" onclick="completeMilestone('${p.id}',${i})">完成</button>` : ''}
+          </div>`).join('')}
+    </div>
+    ${p.desc ? `<div class="detail-section"><h4>项目描述</h4><p style="font-size:13px;color:#555">${p.desc}</p></div>` : ''}`;
+  openModal('detailModal');
+}
+
+function completeMilestone(projId, idx) {
+  const projects = DB.get('projects');
+  const p = projects.find(p => p.id === projId);
+  if (p && p.milestones[idx]) {
+    p.milestones[idx].status = 'done';
+    DB.set('projects', projects);
+    addActivity(`里程碑完成：${p.name} - ${p.milestones[idx].name}`, 'fas fa-check-circle');
+    showToast('里程碑已标记完成！');
+    closeModal('detailModal');
+    renderPage('projects');
+  }
+}
+
+// ============ 跟进提醒 ============
+let followupTab = 'today';
+function switchTab(page, tab) {
+  followupTab = tab;
+  document.querySelectorAll('.followup-tabs .tab-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', ['today','upcoming','all'][i] === tab);
+  });
+  renderFollowup();
+}
+
+function renderFollowup() {
+  const followups = DB.get('followups');
+  const today = new Date(); today.setHours(0,0,0,0);
+  let filtered;
+  if (followupTab === 'today') {
+    filtered = followups.filter(f => { if (!f.nextdate) return false; const d = new Date(f.nextdate); d.setHours(0,0,0,0); return d <= today; });
+  } else if (followupTab === 'upcoming') {
+    filtered = followups.filter(f => { if (!f.nextdate) return false; const d = new Date(f.nextdate); d.setHours(0,0,0,0); const diff = Math.floor((d-today)/86400000); return diff > 0 && diff <= 7; });
+  } else {
+    filtered = [...followups].reverse();
+  }
+  const container = document.getElementById('followupList');
+  if (filtered.length === 0) { container.innerHTML = '<div class="empty-state"><i class="fas fa-bell-slash"></i> 该分类暂无记录</div>'; return; }
+  const typeIcons = { '电话沟通':'fa-phone', '拜访客户':'fa-handshake', '发送邮件':'fa-envelope', '微信沟通':'fa-weixin', '视频会议':'fa-video' };
+  container.innerHTML = filtered.map(f => {
+    const diff = daysDiff(f.nextdate);
+    let sc = 'upcoming', dt = formatDate(f.nextdate);
+    if (diff !== null) {
+      if (diff < 0) { sc = 'overdue'; dt = `逾期${Math.abs(diff)}天`; }
+      else if (diff === 0) { sc = 'today'; dt = '今天'; }
+    }
+    const initials = (f.customerName || '?').charAt(0).toUpperCase();
+    return `<div class="followup-item ${sc}">
+      <div class="followup-avatar">${initials}</div>
+      <div class="followup-info">
+        <div class="followup-title">${f.customerName || '未知客户'}</div>
+        <div class="followup-sub">${f.type} · ${f.owner || ''}</div>
+        ${f.content ? `<div class="followup-content">${f.content.substr(0,80)}${f.content.length>80?'...':''}</div>` : ''}
+        ${f.goal ? `<div style="font-size:12px;color:#1976d2;margin-top:4px"><i class="fas fa-bullseye"></i> 目标：${f.goal}</div>` : ''}
+      </div>
+      <div class="followup-right">
+        <div class="followup-date ${sc}">${dt}</div>
+        <div class="followup-type-icon"><i class="fas ${typeIcons[f.type]||'fa-comment'}"></i></div>
+        <button class="btn btn-sm" style="margin-top:8px;font-size:11px;white-space:nowrap" onclick="completeFollowup('${f.id}')">
+          <i class="fas fa-check"></i> 完成
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function quickFollowup(customerName, customerId) {
+  refreshCustomerSelects();
+  refreshAllSelects();
+  setTimeout(() => {
+    const el = document.getElementById('followup-customer');
+    if (el) el.value = customerId;
+    const nd = document.getElementById('followup-nextdate');
+    const d = new Date(); d.setDate(d.getDate() + 7);
+    if (nd) nd.value = d.toISOString().split('T')[0];
+  }, 50);
+  openModal('addFollowupModal');
+}
+
+function saveFollowup() {
+  const customerId = document.getElementById('followup-customer').value;
+  const nextdate = document.getElementById('followup-nextdate').value;
+  if (!customerId || !nextdate) { showToast('请选择客户并设置下次跟进时间', 'error'); return; }
+  const allItems = [...DB.get('customers').map(c => ({id:`cust_${c.id}`, name:c.company})),
+                    ...DB.get('leads').map(l => ({id:`lead_${l.id}`, name:l.company}))];
+  const found = allItems.find(i => i.id === customerId);
+  const followup = {
+    id: DB.genId(), customerId,
+    customerName: found ? found.name : '未知',
+    type: document.getElementById('followup-type').value,
+    nextdate, priority: document.getElementById('followup-priority').value,
+    content: document.getElementById('followup-content').value,
+    goal: document.getElementById('followup-goal').value,
+    owner: document.getElementById('currentUserName')?.textContent || '管理员',
+    createdAt: new Date().toISOString()
+  };
+  const followups = DB.get('followups'); followups.push(followup); DB.set('followups', followups);
+  addActivity(`新增跟进：${found?.name||''}（${followup.type}）`, 'fas fa-bell');
+  closeModal('addFollowupModal');
+  ['followup-content','followup-goal'].forEach(id => document.getElementById(id).value = '');
+  showToast('跟进记录已保存！');
+  renderPage('followup'); renderPage('dashboard');
+}
+
+function completeFollowup(id) {
+  const followups = DB.get('followups');
+  const f = followups.find(f => f.id === id);
+  if (!f) return;
+  // 弹出更友好的日期选择
+  const modal = document.createElement('div');
+  modal.innerHTML = `
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px">
+      <div style="background:#fff;border-radius:12px;padding:24px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+        <h3 style="margin-bottom:16px;font-size:16px">跟进完成 ✅</h3>
+        <p style="font-size:13px;color:#888;margin-bottom:16px">请设置下次跟进时间，或直接关闭提醒</p>
+        <input type="date" id="nextFollowDate" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;margin-bottom:16px">
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button onclick="this.closest('[style*=fixed]').remove()" style="padding:9px 16px;border-radius:8px;border:1px solid #ddd;background:#f5f5f5;cursor:pointer">取消</button>
+          <button onclick="closeFollowupReminder('${id}',null);this.closest('[style*=fixed]').remove()" style="padding:9px 16px;border-radius:8px;border:none;background:#e53935;color:#fff;cursor:pointer">关闭提醒</button>
+          <button onclick="closeFollowupReminder('${id}',document.getElementById('nextFollowDate').value);this.closest('[style*=fixed]').remove()" style="padding:9px 16px;border-radius:8px;border:none;background:#1a237e;color:#fff;cursor:pointer">保存</button>
+        </div>
+      </div>
+    </div>`;
+  const d = new Date(); d.setDate(d.getDate() + 7);
+  document.body.appendChild(modal);
+  document.getElementById('nextFollowDate').value = d.toISOString().split('T')[0];
+}
+
+function closeFollowupReminder(id, newDate) {
+  const followups = DB.get('followups');
+  const f = followups.find(f => f.id === id);
+  if (!f) return;
+  if (!newDate) {
+    DB.set('followups', followups.filter(f => f.id !== id));
+    showToast('跟进提醒已关闭');
+  } else {
+    f.nextdate = newDate;
+    DB.set('followups', followups);
+    showToast(`下次跟进已设为 ${newDate}`);
+  }
+  renderPage('followup'); renderPage('dashboard');
+}
+
+// ============ 语音录入 ============
+let recognition = null;
+let isRecording = false;
+
+function initVoice() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) return null;
+  const r = new SpeechRecognition();
+  r.lang = 'zh-CN';
+  r.continuous = true;
+  r.interimResults = true;
+  r.maxAlternatives = 1;
+  return r;
+}
+
+function toggleVoice() {
+  const btn = document.getElementById('voiceBtn');
+  const status = document.getElementById('voiceStatus');
+  const textarea = document.getElementById('followup-content');
+  if (!btn || !textarea) return;
+
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showToast('您的浏览器不支持语音识别，建议使用 Safari（iOS）或 Chrome', 'error');
+    return;
+  }
+
+  if (isRecording) {
+    stopVoice();
+    return;
+  }
+
+  recognition = initVoice();
+  if (!recognition) return;
+
+  let finalText = textarea.value;
+  let interimText = '';
+
+  recognition.onstart = () => {
+    isRecording = true;
+    btn.classList.add('recording');
+    btn.innerHTML = '<i class="fas fa-stop"></i><span class="voice-btn-text">停止录音</span>';
+    status.textContent = '🎙 正在录音，请说话...';
+    status.className = 'voice-status recording';
+  };
+
+  recognition.onresult = (e) => {
+    interimText = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      if (e.results[i].isFinal) {
+        finalText += e.results[i][0].transcript;
+      } else {
+        interimText += e.results[i][0].transcript;
+      }
+    }
+    textarea.value = finalText + interimText;
+  };
+
+  recognition.onerror = (e) => {
+    let msg = '语音识别出错';
+    if (e.error === 'not-allowed') msg = '麦克风权限被拒绝，请在设置中允许';
+    else if (e.error === 'no-speech') msg = '未检测到声音，请重试';
+    showToast(msg, 'error');
+    stopVoice();
+  };
+
+  recognition.onend = () => {
+    if (isRecording) recognition.start(); // 自动续录
+  };
+
+  recognition.start();
+}
+
+function stopVoice() {
+  if (recognition) {
+    try { recognition.stop(); } catch(e) {}
+    recognition = null;
+  }
+  isRecording = false;
+  const btn = document.getElementById('voiceBtn');
+  const status = document.getElementById('voiceStatus');
+  if (btn) {
+    btn.classList.remove('recording');
+    btn.innerHTML = '<i class="fas fa-microphone"></i><span class="voice-btn-text">语音录入</span>';
+  }
+  if (status) { status.textContent = ''; status.className = 'voice-status'; }
+}
+
+// ============ 客户维护 ============
+function renderMaintenance() {
+  const plans = DB.get('maintenance');
+  const container = document.getElementById('maintenanceList');
+  if (plans.length === 0) { container.innerHTML = '<div class="empty-state"><i class="fas fa-heart"></i> 暂无维护计划</div>'; return; }
+  const freqMap = { weekly:'每周', biweekly:'每两周', monthly:'每月', quarterly:'每季度' };
+  container.innerHTML = plans.map(p => {
+    const initials = (p.customerName||'?').charAt(0).toUpperCase();
+    return `<div class="maintenance-item">
+      <div class="maint-icon">${initials}</div>
+      <div class="maint-info">
+        <div class="maint-name">${p.customerName}</div>
+        <div class="maint-sub">${p.type} · 负责人：${p.owner}</div>
+        ${p.goal ? `<div style="font-size:12px;color:#555;margin-top:4px">${p.goal}</div>` : ''}
+      </div>
+      <div class="maint-right">
+        <div class="maint-freq">${freqMap[p.frequency]||p.frequency}一次</div>
+        <div class="maint-next">下次：${getNextMaintenanceDate(p)}</div>
+        <button class="action-btn del" onclick="deleteMaintenance('${p.id}')"><i class="fas fa-trash"></i></button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function getNextMaintenanceDate(plan) {
+  if (!plan.createdAt) return '-';
+  const freqDays = { weekly:7, biweekly:14, monthly:30, quarterly:90 };
+  const days = freqDays[plan.frequency] || 30;
+  let next = new Date(plan.createdAt);
+  const now = new Date();
+  while (next <= now) next.setDate(next.getDate() + days);
+  return formatDate(next.toISOString().split('T')[0]);
+}
+
+function saveMaintenance() {
+  const custId = document.getElementById('maint-customer').value;
+  if (!custId) { showToast('请选择客户', 'error'); return; }
+  const allItems = [...DB.get('customers').map(c => ({id:`cust_${c.id}`, name:c.company})),
+                    ...DB.get('leads').map(l => ({id:`lead_${l.id}`, name:l.company}))];
+  const found = allItems.find(i => i.id === custId);
+  const plan = {
+    id: DB.genId(), customerId: custId,
+    customerName: found ? found.name : '未知',
+    frequency: document.getElementById('maint-frequency').value,
+    type: document.getElementById('maint-type').value,
+    owner: document.getElementById('maint-owner').value,
+    goal: document.getElementById('maint-goal').value,
+    createdAt: new Date().toISOString()
+  };
+  const plans = DB.get('maintenance'); plans.push(plan); DB.set('maintenance', plans);
+  addActivity(`制定维护计划：${found?.name}（${plan.frequency}）`, 'fas fa-heart');
+  closeModal('addMaintenanceModal');
+  document.getElementById('maint-goal').value = '';
+  showToast('维护计划已保存！'); renderPage('maintenance');
+}
+
+function deleteMaintenance(id) {
+  if (!confirm('确认删除此维护计划？')) return;
+  DB.set('maintenance', DB.get('maintenance').filter(p => p.id !== id));
+  showToast('已删除'); renderPage('maintenance');
+}
+
+// ============ 名片录入 ============
+function previewCardImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('cardPreviewImg').src = e.target.result;
+    document.getElementById('cardPreview').style.display = 'block';
+    document.getElementById('cardUploadArea').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearCardForm() {
+  ['card-name','card-title','card-company','card-phone','card-email','card-address','card-note'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('card-industry').value = '';
+  document.getElementById('cardPreview').style.display = 'none';
+  document.getElementById('cardUploadArea').style.display = 'block';
+  document.getElementById('cardImageInput').value = '';
+}
+
+function getCardData() {
+  return {
+    name: document.getElementById('card-name').value.trim(),
+    title: document.getElementById('card-title').value.trim(),
+    company: document.getElementById('card-company').value.trim(),
+    phone: document.getElementById('card-phone').value.trim(),
+    email: document.getElementById('card-email').value.trim(),
+    industry: document.getElementById('card-industry').value,
+    address: document.getElementById('card-address').value.trim(),
+    note: document.getElementById('card-note').value.trim()
+  };
+}
+
+function saveCardAsLead() {
+  const data = getCardData();
+  if (!data.company || !data.name) { showToast('请至少填写公司名称和姓名', 'error'); return; }
+  const lead = {
+    id: DB.genId(), company: data.company, contact: data.name,
+    phone: data.phone, source: '名片录入', owner: '管理员',
+    note: `职位：${data.title||'-'} | 邮箱：${data.email||'-'} | 地址：${data.address||'-'}\n${data.note||''}`,
+    status: 'active', createdAt: new Date().toISOString()
+  };
+  const leads = DB.get('leads'); leads.push(lead); DB.set('leads', leads);
+  addActivity(`名片录入线索：${data.company}（${data.name}）`, 'fas fa-id-card');
+  clearCardForm();
+  showToast(`已保存为线索：${data.company}`);
+  navigateTo('leads');
+}
+
+function saveCardAsCustomer() {
+  const data = getCardData();
+  if (!data.company || !data.name || !data.phone) { showToast('请填写公司名称、姓名和手机号', 'error'); return; }
+  const customer = {
+    id: DB.genId(), company: data.company, contact: data.name,
+    phone: data.phone, email: data.email, industry: data.industry || '其他',
+    level: 'B', owner: '管理员', address: data.address,
+    note: `职位：${data.title||'-'}\n${data.note||''}`,
+    createdAt: new Date().toISOString()
+  };
+  const customers = DB.get('customers'); customers.push(customer); DB.set('customers', customers);
+  addActivity(`名片录入客户：${data.company}（${data.name}）`, 'fas fa-id-card');
+  clearCardForm();
+  showToast(`已保存为客户：${data.company}`);
+  navigateTo('customers');
+}
+
+// ============ 搜索过滤 ============
+function filterList(type) {
+  const q = (document.getElementById(type === 'leads' ? 'leadsSearch' : 'customersSearch')?.value || '').toLowerCase();
+  const tbodyId = type === 'leads' ? 'leadsTableBody' : 'customersTableBody';
+  document.querySelectorAll(`#${tbodyId} tr`).forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ============ 数据导入导出 ============
+function exportData() {
+  const keys = ['leads','customers','opportunities','contracts','projects','followups','maintenance','activities','settings'];
+  const data = {};
+  keys.forEach(k => data[k] = DB.get(k));
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `CRM数据备份_${new Date().toLocaleDateString('zh-CN').replace(/\//g,'-')}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('数据已导出');
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!confirm('导入将覆盖现有数据，确认继续？')) return;
+      Object.keys(data).forEach(k => DB.set(k, data[k]));
+      showToast('数据导入成功！');
+      renderPage('dashboard');
+    } catch { showToast('文件格式错误', 'error'); }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function clearAllData() {
+  if (!confirm('⚠️ 将清空所有数据，此操作不可恢复，确认吗？')) return;
+  ['leads','customers','opportunities','contracts','projects','followups','maintenance','activities'].forEach(k => DB.set(k, []));
+  showToast('数据已清空');
+  renderPage('dashboard');
+}
+
+// ============ 合同文件名显示 ============
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'contractFile') {
+    const f = e.target.files[0];
+    const d = document.getElementById('contractFileName');
+    if (f && d) d.textContent = '已选择：' + f.name;
+  }
+});
+
+// ============ 时间显示 ============
+function updateTime() {
+  const el = document.getElementById('currentTime');
+  if (el) {
+    const now = new Date();
+    el.textContent = now.toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
+  }
+}
+setInterval(updateTime, 60000);
+
+// ============ 侧边栏控制 ============
+document.getElementById('sidebarToggle').addEventListener('click', function() {
+  document.getElementById('sidebar').classList.toggle('collapsed');
+});
+document.getElementById('mobileMenuBtn').addEventListener('click', function() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+  sidebar.classList.toggle('mobile-open');
+  overlay.classList.toggle('active');
+});
+
+// ============ 导航绑定 ============
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', function(e) {
+    e.preventDefault();
+    const page = this.dataset.page;
+    if (page) navigateTo(page);
+  });
+});
+
+// ============ 初始化 ============
+function init() {
+  updateTime();
+  refreshAllSelects();
+  navigateTo('dashboard');
+  if (DB.get('customers').length === 0 && DB.get('leads').length === 0) {
+    initDemoData();
+  }
+}
+
+function initDemoData() {
+  DB.set('customers', [
+    { id:'demo1', company:'华联精密制造有限公司', contact:'李总', phone:'138-0000-1111', email:'li@hualian.com', industry:'制造业', level:'A', owner:'张三', address:'上海市浦东新区', note:'老客户，有二次采购意向', createdAt: new Date().toISOString() },
+    { id:'demo2', company:'东方汽车零部件厂', contact:'王经理', phone:'139-0000-2222', email:'', industry:'汽车行业', level:'B', owner:'李四', address:'苏州工业园区', note:'价格敏感', createdAt: new Date().toISOString() }
+  ]);
+  DB.set('leads', [
+    { id:'lead1', company:'中原食品集团', contact:'赵总助', phone:'137-0000-3333', source:'展会获取', owner:'王五', nextfollow: new Date(Date.now()+86400000).toISOString().split('T')[0], note:'展会获取，MES兴趣', status:'active', createdAt: new Date().toISOString() },
+    { id:'lead2', company:'蓝天化工股份', contact:'孙副总', phone:'136-0000-4444', source:'老客户推荐', owner:'张三', nextfollow: new Date().toISOString().split('T')[0], note:'华联精密推荐，需求明确', status:'active', createdAt: new Date().toISOString() }
+  ]);
+  DB.set('opportunities', [
+    { id:'opp1', name:'华联精密MES系统升级', customerId:'demo1', customerName:'华联精密制造有限公司', amount:'85', stage:'negotiation', owner:'张三', closedate: new Date(Date.now()+30*86400000).toISOString().split('T')[0], needs:[{desc:'MES生产管理系统', product:'MES系统', amount:'85'}], createdAt: new Date().toISOString() },
+    { id:'opp2', name:'东方汽车自动化产线', customerId:'demo2', customerName:'东方汽车零部件厂', amount:'120', stage:'proposal', owner:'李四', closedate: new Date(Date.now()+60*86400000).toISOString().split('T')[0], needs:[{desc:'自动化装配产线', product:'自动化产线', amount:'120'}], createdAt: new Date().toISOString() }
+  ]);
+  DB.set('contracts', [
+    { id:'ct1', no:'HT-2026-001', amount:'52', customerId:'demo1', customerName:'华联精密制造有限公司', date: new Date().toISOString().split('T')[0], status:'active', owner:'张三', note:'', fileName:'', createdAt: new Date().toISOString() }
+  ]);
+  DB.set('followups', [
+    { id:'f1', customerId:'cust_demo1', customerName:'华联精密制造有限公司', type:'电话沟通', nextdate: new Date().toISOString().split('T')[0], priority:'high', content:'与李总确认了系统需求，希望Q2上线', goal:'敲定合同签署时间', owner:'张三', createdAt: new Date().toISOString() },
+    { id:'f2', customerId:'lead_lead2', customerName:'蓝天化工股份', type:'拜访客户', nextdate: new Date().toISOString().split('T')[0], priority:'high', content:'初次拜访，SCADA需求强烈', goal:'提交初步方案', owner:'张三', createdAt: new Date().toISOString() }
+  ]);
+  DB.set('maintenance', [
+    { id:'m1', customerId:'cust_demo1', customerName:'华联精密制造有限公司', frequency:'monthly', type:'电话问候', owner:'张三', goal:'了解使用情况，挖掘二次需求', createdAt: new Date().toISOString() }
+  ]);
+  addActivity('系统初始化，演示数据已加载', 'fas fa-rocket');
+}
+
+init();
