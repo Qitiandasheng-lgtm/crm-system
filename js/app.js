@@ -851,6 +851,14 @@ function saveContract() {
   closeModal('addContractModal');
   // 清空发票字段
   ['contract-no','contract-amount','contract-note','contract-invoice-title','contract-invoice-taxno','contract-invoice-bank','contract-invoice-account','contract-invoice-address','contract-invoice-phone'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  const pasteArea = document.getElementById('invoicePasteArea');
+  if (pasteArea) pasteArea.value = '';
+  const pasteBox = document.getElementById('invoicePasteBox');
+  if (pasteBox) pasteBox.style.display = 'none';
+  const prevImg = document.getElementById('invoiceImgPreview');
+  if (prevImg) { prevImg.src = ''; prevImg.style.display = 'none'; }
+  const ocrStatus = document.getElementById('invoiceOcrStatus');
+  if (ocrStatus) ocrStatus.textContent = '';
   showToast('合同保存成功！'); renderPage('contracts');
 }
 
@@ -1411,53 +1419,157 @@ document.addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (!file) return;
     const statusEl = document.getElementById('invoiceOcrStatus');
-    if (statusEl) { statusEl.textContent = '识别中，请稍候...'; statusEl.style.color = '#1976d2'; }
+    const pasteBox = document.getElementById('invoicePasteBox');
+    if (statusEl) { statusEl.textContent = '图片已上传，正在尝试识别...'; statusEl.style.color = '#1976d2'; }
     const reader = new FileReader();
     reader.onload = function(ev) {
       // 显示预览
       const prevEl = document.getElementById('invoiceImgPreview');
       if (prevEl) { prevEl.src = ev.target.result; prevEl.style.display = 'block'; }
-      // 尝试OCR
+      // 尝试OCR（Tesseract.js）
       if (window.Tesseract) {
-        Tesseract.recognize(ev.target.result, 'chi_sim+eng', { logger: () => {} })
-          .then(({ data: { text } }) => {
+        Tesseract.recognize(ev.target.result, 'chi_sim+eng', {
+          logger: () => {},
+          langPath: 'https://tessdata.projectnaptha.com/4.0.0'
+        }).then(({ data: { text } }) => {
+          if (text && text.trim().length > 10) {
             parseInvoiceText(text);
             if (statusEl) { statusEl.textContent = '识别完成，请核对并补充信息'; statusEl.style.color = '#388e3c'; }
-          }).catch(() => {
-            if (statusEl) { statusEl.textContent = '自动识别失败，请手动填写'; statusEl.style.color = '#e53935'; }
-          });
+          } else {
+            // 识别内容太少，提示粘贴文字
+            if (statusEl) { statusEl.textContent = '图片识别效果不佳，建议粘贴开票资料文字'; statusEl.style.color = '#f57c00'; }
+            if (pasteBox) pasteBox.style.display = 'block';
+          }
+        }).catch(() => {
+          if (statusEl) { statusEl.textContent = '识别失败，请粘贴开票资料文字'; statusEl.style.color = '#e53935'; }
+          if (pasteBox) pasteBox.style.display = 'block';
+        });
       } else {
-        if (statusEl) { statusEl.textContent = '请手动填写下方发票信息'; statusEl.style.color = '#888'; }
+        // 没有Tesseract，直接显示粘贴框
+        if (statusEl) { statusEl.textContent = '请粘贴开票资料文字自动识别 ↓'; statusEl.style.color = '#888'; }
+        if (pasteBox) pasteBox.style.display = 'block';
       }
     };
     reader.readAsDataURL(file);
   }
 });
 
+// 从文本解析发票信息（支持标准增值税发票开票资料格式）
 function parseInvoiceText(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!text || text.trim().length < 5) return;
+  const lines = text.split(/\n|；|;/).map(l => l.trim()).filter(Boolean);
   const fullText = lines.join(' ');
-  // 提取税号（15-20位字母数字）
-  const taxMatch = fullText.match(/[0-9A-Z]{15,20}/);
-  if (taxMatch) { const el = document.getElementById('contract-invoice-taxno'); if (el && !el.value) el.value = taxMatch[0]; }
-  // 提取银行账号（一串数字）
-  const bankAccMatch = fullText.match(/\d{16,22}/);
-  if (bankAccMatch) { const el = document.getElementById('contract-invoice-account'); if (el && !el.value) el.value = bankAccMatch[0]; }
-  // 提取电话
-  const phoneMatch = fullText.match(/[\d\-]{7,12}/);
-  if (phoneMatch) { const el = document.getElementById('contract-invoice-phone'); if (el && !el.value) el.value = phoneMatch[0]; }
-  // 尝试找公司名（含"有限公司"/"集团"的行）
-  for (const line of lines) {
-    if ((line.includes('有限') || line.includes('集团') || line.includes('股份')) && line.length > 4 && line.length < 50) {
-      const el = document.getElementById('contract-invoice-title'); if (el && !el.value) { el.value = line; break; }
+
+  // 辅助：设置字段值（仅当未填写时）
+  function setField(id, val) {
+    if (!val) return;
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = val.trim();
+  }
+  function setFieldForce(id, val) {
+    if (!val) return;
+    const el = document.getElementById(id);
+    if (el) el.value = val.trim();
+  }
+
+  // ---- 1. 公司名称（发票抬头） ----
+  // 格式1: "公司名称：xx有限公司"
+  let m = fullText.match(/公司名称[：:]\s*([^\s，,\n；;]{4,40})/);
+  if (m) setFieldForce('contract-invoice-title', m[1]);
+  else {
+    // 格式2: 包含"有限公司"/"集团"/"股份"的独立行
+    for (const line of lines) {
+      const clean = line.replace(/^[公司名称：:\s]+/, '');
+      if ((clean.includes('有限') || clean.includes('集团') || clean.includes('股份') || clean.includes('公司')) && clean.length > 4 && clean.length < 50) {
+        setFieldForce('contract-invoice-title', clean); break;
+      }
     }
   }
-  // 尝试找银行名
-  for (const line of lines) {
-    if (line.includes('银行') && line.length < 30) {
-      const el = document.getElementById('contract-invoice-bank'); if (el && !el.value) { el.value = line; break; }
+
+  // ---- 2. 纳税人识别号 ----
+  // 格式: "纳税人识别号：91330304797609680M"
+  m = fullText.match(/纳税人识别号[：:]\s*([0-9A-Za-z]{15,20})/);
+  if (m) setFieldForce('contract-invoice-taxno', m[1].toUpperCase());
+  else {
+    // 直接匹配18位统一社会信用代码格式
+    m = fullText.match(/\b([0-9A-HJ-NP-Z]{18})\b/);
+    if (m) setFieldForce('contract-invoice-taxno', m[1]);
+    else {
+      m = fullText.match(/[0-9A-Z]{15,20}/);
+      if (m) setFieldForce('contract-invoice-taxno', m[0]);
     }
   }
+
+  // ---- 3. 地址 + 电话（常见格式：地址、电话：浙江省...) ----
+  // 格式: "地址、电话：浙江省温州市... 0577-12345678"
+  m = fullText.match(/地址[、,，]?电话[：:]\s*(.+?)(?=开户|$)/);
+  if (m) {
+    const addrPhoneStr = m[1].trim();
+    // 分离电话（0+区号-数字 或 纯数字7-8位）
+    const phoneInStr = addrPhoneStr.match(/(0\d{2,3}[\-\s]?\d{7,8})/);
+    if (phoneInStr) {
+      setFieldForce('contract-invoice-phone', phoneInStr[1]);
+      setFieldForce('contract-invoice-address', addrPhoneStr.replace(phoneInStr[1], '').trim());
+    } else {
+      setFieldForce('contract-invoice-address', addrPhoneStr);
+    }
+  } else {
+    // 单独匹配地址
+    m = fullText.match(/地址[：:]\s*([^\n，,；;]{6,60})/);
+    if (m) setFieldForce('contract-invoice-address', m[1]);
+    // 单独匹配电话
+    m = fullText.match(/电话[：:]\s*(0\d{2,3}[\-\s]?\d{7,8})/);
+    if (m) setFieldForce('contract-invoice-phone', m[1]);
+    else {
+      m = fullText.match(/(0\d{2,3}[\-\s]\d{7,8})/);
+      if (m) setFieldForce('contract-invoice-phone', m[1]);
+    }
+  }
+
+  // ---- 4. 开户银行 + 账号 ----
+  // 格式: "开户行及帐号：温州瓯海农村商业银行...梓岙支行 201000019794288"
+  m = fullText.match(/开户(?:行及帐号|银行|行)[：:]\s*(.+)/);
+  if (m) {
+    const bankStr = m[1].trim();
+    // 账号：末尾的纯数字串（12位以上）
+    const accMatch = bankStr.match(/(\d{12,22})\s*$/);
+    if (accMatch) {
+      setFieldForce('contract-invoice-account', accMatch[1]);
+      setFieldForce('contract-invoice-bank', bankStr.replace(accMatch[1], '').trim());
+    } else {
+      // 账号可能单独在下一行
+      setFieldForce('contract-invoice-bank', bankStr);
+      const accLine = fullText.match(/(\d{12,22})/);
+      if (accLine) setField('contract-invoice-account', accLine[1]);
+    }
+  } else {
+    // 银行账号单独匹配
+    m = fullText.match(/(\d{16,22})/);
+    if (m) setFieldForce('contract-invoice-account', m[1]);
+    for (const line of lines) {
+      if (line.includes('银行') && line.length < 40) {
+        setField('contract-invoice-bank', line.replace(/开户行[及帐号：:]+/, '').trim()); break;
+      }
+    }
+  }
+}
+
+// 手动粘贴文字识别发票信息
+function parseInvoiceFromPaste() {
+  const ta = document.getElementById('invoicePasteArea');
+  if (!ta || !ta.value.trim()) { showToast('请先粘贴开票资料文字', 'error'); return; }
+  // 先清空所有字段再重新填充
+  ['contract-invoice-title','contract-invoice-taxno','contract-invoice-phone',
+   'contract-invoice-bank','contract-invoice-account','contract-invoice-address'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  parseInvoiceText(ta.value);
+  const statusEl = document.getElementById('invoiceOcrStatus');
+  if (statusEl) { statusEl.textContent = '解析完成，请核对信息'; statusEl.style.color = '#388e3c'; }
+  ta.value = '';
+  const pasteBox = document.getElementById('invoicePasteBox');
+  if (pasteBox) pasteBox.style.display = 'none';
+  showToast('发票信息已自动填充，请核对');
 }
 
 // ============ 时间显示 ============
