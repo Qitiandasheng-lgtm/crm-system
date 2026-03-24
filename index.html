@@ -21,7 +21,8 @@
       <p>请输入访问密码</p>
     </div>
     <div class="login-form">
-      <input type="password" id="loginPassword" placeholder="请输入密码" onkeypress="if(event.key==='Enter')checkLogin()">
+      <input type="text" id="loginUsername" placeholder="请输入用户名" autocomplete="username" onkeypress="if(event.key==='Enter')document.getElementById('loginPassword').focus()">
+      <input type="password" id="loginPassword" placeholder="请输入密码" autocomplete="current-password" onkeypress="if(event.key==='Enter')checkLogin()">
       <button onclick="checkLogin()" class="login-btn">登录</button>
     </div>
   </div>
@@ -308,6 +309,35 @@
     <!-- ===== 系统设置 ===== -->
     <div id="page-settings" class="page">
       <div class="settings-grid">
+
+        <!-- 账号安全 -->
+        <div class="card settings-card" style="grid-column:1/-1">
+          <div class="card-header"><h3><i class="fas fa-user-shield"></i> 账号安全</h3></div>
+          <div class="settings-body" style="padding:16px">
+            <div class="account-security-grid">
+              <div class="form-group">
+                <label>当前用户名</label>
+                <input type="text" id="newUsername" placeholder="输入新用户名" maxlength="20">
+              </div>
+              <div class="form-group">
+                <label>原密码</label>
+                <input type="password" id="oldPassword" placeholder="输入当前密码" autocomplete="current-password">
+              </div>
+              <div class="form-group">
+                <label>新密码</label>
+                <input type="password" id="newPassword" placeholder="输入新密码（至少6位）" autocomplete="new-password">
+              </div>
+              <div class="form-group">
+                <label>确认新密码</label>
+                <input type="password" id="confirmPassword" placeholder="再次输入新密码" autocomplete="new-password">
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-primary btn-sm" onclick="saveAccountSecurity()"><i class="fas fa-save"></i> 保存修改</button>
+              <span id="accountSecurityTip" style="font-size:12px;color:#888">用户名和密码可分别单独修改，不填则不改</span>
+            </div>
+          </div>
+        </div>
 
         <!-- 团队成员 -->
         <div class="card settings-card">
@@ -632,23 +662,54 @@
 <div id="toast" class="toast"></div>
 
 <script>
-// 登录密码验证
-const LOGIN_PASSWORD = 'crm888'; // 默认密码，部署后可以修改
+// ============ 账号管理（用户名+密码存储在localStorage）============
+const DEFAULT_USERNAME = 'admin';
+const DEFAULT_PASSWORD = 'crm888';
+
+function getAccount() {
+  return {
+    username: localStorage.getItem('crm_username') || DEFAULT_USERNAME,
+    password: localStorage.getItem('crm_password') || DEFAULT_PASSWORD
+  };
+}
 
 function checkLogin() {
-  const input = document.getElementById('loginPassword').value;
-  if (input === LOGIN_PASSWORD) {
+  const inputUser = document.getElementById('loginUsername').value.trim();
+  const inputPass = document.getElementById('loginPassword').value;
+  const account = getAccount();
+  if (!inputUser) { showLoginError('请输入用户名'); return; }
+  if (!inputPass) { showLoginError('请输入密码'); return; }
+  if (inputUser === account.username && inputPass === account.password) {
     document.getElementById('loginOverlay').style.display = 'none';
     sessionStorage.setItem('crm_logged_in', 'true');
+    sessionStorage.setItem('crm_current_user', inputUser);
+    // 更新右上角显示用户名
+    const userEl = document.getElementById('currentUserName');
+    if (userEl) userEl.textContent = inputUser;
   } else {
-    showToast('密码错误，请重试', 'error');
+    showLoginError('用户名或密码错误，请重试');
     document.getElementById('loginPassword').value = '';
   }
+}
+
+function showLoginError(msg) {
+  let errEl = document.getElementById('loginError');
+  if (!errEl) {
+    errEl = document.createElement('div');
+    errEl.id = 'loginError';
+    errEl.style.cssText = 'color:#e53935;font-size:13px;margin-top:8px;text-align:center';
+    document.querySelector('.login-form').appendChild(errEl);
+  }
+  errEl.textContent = msg;
+  setTimeout(() => { if (errEl) errEl.textContent = ''; }, 3000);
 }
 
 // 检查是否已登录
 if (sessionStorage.getItem('crm_logged_in') === 'true') {
   document.getElementById('loginOverlay').style.display = 'none';
+  const savedUser = sessionStorage.getItem('crm_current_user') || getAccount().username;
+  const userEl = document.getElementById('currentUserName');
+  if (userEl) userEl.textContent = savedUser;
 }
 </script>
 <script src="js/app.js"></script>
