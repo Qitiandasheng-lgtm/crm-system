@@ -819,6 +819,7 @@ function renderContracts() {
     <td>${c.owner}</td>
     <td>
       <button class="action-btn view" onclick="viewContractDetail('${c.id}')"><i class="fas fa-eye"></i></button>
+      <button class="action-btn edit" onclick="editContract('${c.id}')" title="编辑"><i class="fas fa-edit"></i></button>
       <button class="action-btn del" onclick="deleteContract('${c.id}')"><i class="fas fa-trash"></i></button>
     </td>
   </tr>`).join('');
@@ -868,6 +869,90 @@ function deleteContract(id) {
   showToast('已删除'); renderPage('contracts');
 }
 
+function editContract(id) {
+  const c = DB.get('contracts').find(c => c.id === id);
+  if (!c) return;
+  // 关闭详情弹窗（如果开着）
+  closeModal('detailModal');
+  refreshAllSelects();
+  // 填充客户下拉
+  const custSel = document.getElementById('contract-customer');
+  if (custSel) {
+    const customers = DB.get('customers');
+    custSel.innerHTML = '<option value="">请选择客户</option>' + customers.map(cu => `<option value="${cu.id}">${cu.company}</option>`).join('');
+  }
+  // 填充负责人下拉
+  const ownerSel = document.getElementById('contract-owner');
+  if (ownerSel) {
+    const s = getSettings();
+    ownerSel.innerHTML = (s.owners || []).map(o => `<option value="${o}">${o}</option>`).join('');
+  }
+  setTimeout(() => {
+    document.getElementById('contract-no').value = c.no || '';
+    document.getElementById('contract-amount').value = c.amount || '';
+    const custEl = document.getElementById('contract-customer');
+    if (custEl) custEl.value = c.customerId || '';
+    document.getElementById('contract-date').value = c.date || '';
+    document.getElementById('contract-status').value = c.status || 'active';
+    const ownerEl = document.getElementById('contract-owner');
+    if (ownerEl) ownerEl.value = c.owner || '';
+    document.getElementById('contract-note').value = c.note || '';
+    // 发票信息
+    document.getElementById('contract-invoice-title').value = c.invoiceTitle || '';
+    document.getElementById('contract-invoice-taxno').value = c.invoiceTaxNo || '';
+    document.getElementById('contract-invoice-bank').value = c.invoiceBank || '';
+    document.getElementById('contract-invoice-account').value = c.invoiceAccount || '';
+    document.getElementById('contract-invoice-address').value = c.invoiceAddress || '';
+    document.getElementById('contract-invoice-phone').value = c.invoicePhone || '';
+    // 修改按钮
+    const saveBtn = document.querySelector('#addContractModal .modal-footer .btn-primary');
+    saveBtn.textContent = '保存修改';
+    saveBtn.onclick = () => updateContract(id);
+    document.querySelector('#addContractModal .modal-header h3').textContent = '编辑合同';
+    document.getElementById('addContractModal').classList.add('active');
+    document.getElementById('overlay').classList.add('active');
+  }, 100);
+}
+
+function updateContract(id) {
+  const no = document.getElementById('contract-no').value.trim();
+  const amount = document.getElementById('contract-amount').value;
+  if (!no || !amount) { showToast('请填写合同编号和金额', 'error'); return; }
+  const contracts = DB.get('contracts');
+  const c = contracts.find(c => c.id === id);
+  if (!c) return;
+  const custId = document.getElementById('contract-customer').value;
+  const found = DB.get('customers').find(cu => cu.id === custId);
+  c.no = no;
+  c.amount = amount;
+  c.customerId = custId;
+  c.customerName = found ? found.company : (c.customerName || '');
+  c.date = document.getElementById('contract-date').value;
+  c.status = document.getElementById('contract-status').value;
+  c.owner = document.getElementById('contract-owner').value;
+  c.note = document.getElementById('contract-note').value;
+  c.invoiceTitle = document.getElementById('contract-invoice-title').value.trim();
+  c.invoiceTaxNo = document.getElementById('contract-invoice-taxno').value.trim();
+  c.invoiceBank = document.getElementById('contract-invoice-bank').value.trim();
+  c.invoiceAccount = document.getElementById('contract-invoice-account').value.trim();
+  c.invoiceAddress = document.getElementById('contract-invoice-address').value.trim();
+  c.invoicePhone = document.getElementById('contract-invoice-phone').value.trim();
+  DB.set('contracts', contracts);
+  addActivity(`编辑合同：${no}`, 'fas fa-edit');
+  closeModal('addContractModal');
+  // 重置按钮
+  const saveBtn = document.querySelector('#addContractModal .modal-footer .btn-primary');
+  saveBtn.textContent = '保存合同';
+  saveBtn.onclick = saveContract;
+  document.querySelector('#addContractModal .modal-header h3').textContent = '上传合同';
+  // 清空字段
+  ['contract-no','contract-amount','contract-note','contract-invoice-title','contract-invoice-taxno',
+   'contract-invoice-bank','contract-invoice-account','contract-invoice-address','contract-invoice-phone'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  showToast('合同已更新！'); renderPage('contracts');
+}
+
 function viewContractDetail(id) {
   const c = DB.get('contracts').find(c => c.id === id);
   if (!c) return;
@@ -895,7 +980,10 @@ function viewContractDetail(id) {
         ${c.invoiceAddress ? `<div class="detail-item"><label>注册地址</label><span>${c.invoiceAddress}</span></div>` : ''}
         ${c.invoicePhone ? `<div class="detail-item"><label>注册电话</label><span>${c.invoicePhone}</span></div>` : ''}
       </div>
-    </div>` : ''}`;
+    </div>` : ''}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
+      <button class="btn btn-outline btn-sm" onclick="editContract('${id}')"><i class="fas fa-edit"></i> 编辑合同</button>
+    </div>`;
   openModal('detailModal');
 }
 
