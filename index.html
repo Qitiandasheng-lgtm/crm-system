@@ -9,6 +9,7 @@
 <title>销售CRM系统</title>
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body>
 <!-- 登录遮罩 -->
@@ -271,10 +272,15 @@
           <div class="card-scan-tips">
             <div class="tip-item"><i class="fas fa-camera"></i><span>拍照上传名片，手动确认信息后保存为线索或客户</span></div>
           </div>
-          <div class="card-upload-area" id="cardUploadArea" onclick="document.getElementById('cardImageInput').click()">
+          <div class="card-upload-area" id="cardUploadArea">
             <i class="fas fa-cloud-upload-alt"></i>
-            <p>点击上传名片图片</p><p class="sub-text">支持 JPG、PNG 格式</p>
-            <input type="file" id="cardImageInput" accept="image/*" capture="environment" style="display:none" onchange="previewCardImage(event)">
+            <p>上传名片图片</p><p class="sub-text">支持拍照或从相册选择</p>
+            <div style="display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap">
+              <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('cardImageCamera').click()"><i class="fas fa-camera"></i> 拍照</button>
+              <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('cardImageGallery').click()"><i class="fas fa-images"></i> 从相册选择</button>
+            </div>
+            <input type="file" id="cardImageCamera" accept="image/*" capture="environment" style="display:none" onchange="previewCardImage(event)">
+            <input type="file" id="cardImageGallery" accept="image/*" style="display:none" onchange="previewCardImage(event)">
           </div>
           <div id="cardPreview" style="display:none"><img id="cardPreviewImg" src="" alt="名片预览"></div>
           <div class="card-form">
@@ -487,7 +493,31 @@
         </div>
         <div id="contractFileName" class="file-name-display"></div>
       </div>
-      <div class="form-group full-width"><label>备注</label><textarea id="contract-note" placeholder="合同相关备注..." rows="3"></textarea></div>
+      <div class="form-group full-width"><label>备注</label><textarea id="contract-note" placeholder="合同相关备注..." rows="2"></textarea></div>
+    </div>
+    <!-- 发票抬头区域 -->
+    <div class="invoice-section">
+      <div class="invoice-section-header">
+        <h4><i class="fas fa-file-invoice" style="color:#e65100;margin-right:6px"></i>发票抬头信息</h4>
+        <span style="font-size:12px;color:#888">可上传增值税发票图片自动识别</span>
+      </div>
+      <div class="invoice-upload-row">
+        <div class="invoice-img-upload" onclick="document.getElementById('invoiceImageInput').click()">
+          <i class="fas fa-camera"></i>
+          <span>上传发票图片识别</span>
+          <input type="file" id="invoiceImageInput" accept="image/*" style="display:none">
+        </div>
+        <img id="invoiceImgPreview" src="" alt="发票预览" style="display:none;max-height:80px;border-radius:6px;border:1px solid #eee">
+        <div id="invoiceOcrStatus" style="font-size:12px;color:#888;margin-top:4px"></div>
+      </div>
+      <div class="form-grid" style="margin-top:12px">
+        <div class="form-group full-width"><label>发票抬头（公司名称）</label><input type="text" id="contract-invoice-title" placeholder="企业全称，如：xx有限公司"></div>
+        <div class="form-group"><label>纳税人识别号</label><input type="text" id="contract-invoice-taxno" placeholder="15-20位税号"></div>
+        <div class="form-group"><label>注册电话</label><input type="text" id="contract-invoice-phone" placeholder="注册电话"></div>
+        <div class="form-group"><label>开户银行</label><input type="text" id="contract-invoice-bank" placeholder="开户银行全称"></div>
+        <div class="form-group"><label>银行账号</label><input type="text" id="contract-invoice-account" placeholder="银行账号"></div>
+        <div class="form-group full-width"><label>注册地址</label><input type="text" id="contract-invoice-address" placeholder="企业注册地址"></div>
+      </div>
     </div>
   </div>
   <div class="modal-footer">
