@@ -39,6 +39,66 @@ function renderSettings() {
       </div>`
     ).join('');
   });
+  // 显示当前用户名到账号安全输入框
+  const unEl = document.getElementById('newUsername');
+  if (unEl) {
+    const curUser = sessionStorage.getItem('crm_current_user') || localStorage.getItem('crm_username') || 'admin';
+    unEl.placeholder = `当前用户名：${curUser}`;
+    unEl.value = '';
+  }
+  // 清空密码框
+  ['oldPassword','newPassword','confirmPassword'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const tipEl = document.getElementById('accountSecurityTip');
+  if (tipEl) tipEl.textContent = '用户名和密码可分别单独修改，不填则不改';
+}
+
+// 保存账号安全（修改用户名/密码）
+function saveAccountSecurity() {
+  const newUsername = document.getElementById('newUsername').value.trim();
+  const oldPassword = document.getElementById('oldPassword').value;
+  const newPassword = document.getElementById('newPassword').value;
+  const confirmPassword = document.getElementById('confirmPassword').value;
+  const tipEl = document.getElementById('accountSecurityTip');
+
+  const curUsername = localStorage.getItem('crm_username') || 'admin';
+  const curPassword = localStorage.getItem('crm_password') || 'crm888';
+
+  let changed = false;
+
+  // 修改用户名（单独修改，无需旧密码）
+  if (newUsername) {
+    if (newUsername.length < 2) { showToast('用户名至少2个字符', 'error'); return; }
+    localStorage.setItem('crm_username', newUsername);
+    sessionStorage.setItem('crm_current_user', newUsername);
+    const userEl = document.getElementById('currentUserName');
+    if (userEl) userEl.textContent = newUsername;
+    changed = true;
+  }
+
+  // 修改密码（需填写旧密码）
+  if (oldPassword || newPassword || confirmPassword) {
+    if (!oldPassword) { showToast('请输入当前密码', 'error'); return; }
+    if (oldPassword !== curPassword) { showToast('当前密码错误', 'error'); document.getElementById('oldPassword').value = ''; return; }
+    if (!newPassword) { showToast('请输入新密码', 'error'); return; }
+    if (newPassword.length < 6) { showToast('新密码至少6位', 'error'); return; }
+    if (newPassword !== confirmPassword) { showToast('两次密码不一致', 'error'); document.getElementById('confirmPassword').value = ''; return; }
+    localStorage.setItem('crm_password', newPassword);
+    changed = true;
+  }
+
+  if (!changed) { showToast('未填写任何修改内容', 'error'); return; }
+
+  // 清空输入框
+  ['newUsername','oldPassword','newPassword','confirmPassword'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  const curUser2 = localStorage.getItem('crm_username') || 'admin';
+  const unEl = document.getElementById('newUsername');
+  if (unEl) unEl.placeholder = `当前用户名：${curUser2}`;
+  if (tipEl) { tipEl.textContent = '✅ 修改成功！下次登录生效'; tipEl.style.color = '#388e3c'; setTimeout(() => { if(tipEl) { tipEl.textContent = '用户名和密码可分别单独修改，不填则不改'; tipEl.style.color = '#888'; } }, 3000); }
+  showToast('账号信息已更新！');
 }
 
 function addSettingItem(key) {
