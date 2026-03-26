@@ -243,6 +243,7 @@
     <div id="page-followup" class="page">
       <div class="page-actions">
         <button class="btn btn-primary" onclick="openModal('addFollowupModal')"><i class="fas fa-plus"></i> 新增跟进记录</button>
+        <button class="btn btn-outline" onclick="openCalendarExport()" style="color:#1976d2;border-color:#1976d2"><i class="fas fa-calendar-plus"></i> 导出到苹果日历</button>
       </div>
       <div class="followup-tabs">
         <button class="tab-btn active" onclick="switchTab('followup','today')">今日到期</button>
@@ -447,8 +448,13 @@
   <div class="modal-header"><h3>新增客户</h3><button onclick="closeModal('addCustomerModal')"><i class="fas fa-times"></i></button></div>
   <div class="modal-body">
     <div class="form-grid">
-      <div class="form-group"><label>公司名称 *</label><input type="text" id="cust-company" placeholder="公司全称"></div>
+      <div class="form-group" style="position:relative">
+        <label>公司名称 *</label>
+        <input type="text" id="cust-company" placeholder="输入公司名称可模糊搜索" autocomplete="off" oninput="searchExistingCustomer(this.value)">
+        <div id="custCompanySuggest" class="company-suggest-box" style="display:none"></div>
+      </div>
       <div class="form-group"><label>联系人 *</label><input type="text" id="cust-contact" placeholder="主要联系人"></div>
+      <div class="form-group"><label>职位</label><input type="text" id="cust-position" placeholder="如：采购经理、总经理"></div>
       <div class="form-group"><label>联系电话 *</label><input type="tel" id="cust-phone" placeholder="手机号码"></div>
       <div class="form-group"><label>邮箱</label><input type="email" id="cust-email" placeholder="电子邮箱"></div>
       <div class="form-group"><label>行业</label><select id="cust-industry"></select></div>
@@ -628,6 +634,25 @@
   <div class="modal-footer">
     <button class="btn btn-secondary" onclick="closeModal('addFollowupModal')">取消</button>
     <button class="btn btn-primary" onclick="saveFollowup()">保存记录</button>
+  </div>
+</div>
+
+<!-- ===== 模态框：导出日历提醒 ===== -->
+<div class="modal" id="exportCalendarModal" style="max-width:400px">
+  <div class="modal-header"><h3><i class="fas fa-calendar-plus" style="color:#1976d2;margin-right:8px"></i>添加到苹果日历</h3><button onclick="closeModal('exportCalendarModal')"><i class="fas fa-times"></i></button></div>
+  <div class="modal-body">
+    <p style="font-size:13px;color:#666;margin-bottom:16px">将跟进提醒导出为日历文件（.ics），点击后可直接在 iPhone/iPad 日历 App 中添加并设置提醒通知。</p>
+    <div id="calendarExportList" style="display:flex;flex-direction:column;gap:8px;max-height:320px;overflow-y:auto"></div>
+    <div style="margin-top:16px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:12px;color:#555;line-height:1.6">
+      <strong>📱 使用步骤：</strong><br>
+      1. 点击下方按钮下载 .ics 文件<br>
+      2. 手机打开文件，选择"添加到日历"<br>
+      3. 日历 App 将在提醒时间发送通知
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('exportCalendarModal')">关闭</button>
+    <button class="btn btn-primary" onclick="exportAllFollowupsToCalendar()"><i class="fas fa-download"></i> 全部导出</button>
   </div>
 </div>
 
