@@ -544,8 +544,12 @@ function saveCustomer() {
   const contact = document.getElementById('cust-contact').value.trim();
   const phone = document.getElementById('cust-phone').value.trim();
   if (!company || !contact || !phone) { showToast('请填写公司名称、联系人和联系电话', 'error'); return; }
+  // 重复客户校验
+  const existing = DB.get('customers').find(c => c.company.trim() === company);
+  if (existing) { showToast(`"${company}" 已是现有客户，请勿重复录入`, 'error'); return; }
   const customer = {
     id: DB.genId(), company, contact, phone,
+    position: document.getElementById('cust-position').value.trim(),
     email: document.getElementById('cust-email').value,
     industry: document.getElementById('cust-industry').value,
     level: document.getElementById('cust-level').value,
@@ -557,7 +561,8 @@ function saveCustomer() {
   const customers = DB.get('customers'); customers.push(customer); DB.set('customers', customers);
   addActivity(`新增客户：${company}（${customer.level}级）`, 'fas fa-users');
   closeModal('addCustomerModal');
-  ['cust-company','cust-contact','cust-phone','cust-email','cust-address','cust-note'].forEach(id => document.getElementById(id).value = '');
+  ['cust-company','cust-contact','cust-position','cust-phone','cust-email','cust-address','cust-note'].forEach(id => document.getElementById(id).value = '');
+  const sb = document.getElementById('custCompanySuggest'); if(sb) sb.style.display='none';
   showToast('客户保存成功！'); renderPage('customers');
 }
 
@@ -575,6 +580,7 @@ function editCustomer(id) {
   setTimeout(() => {
     document.getElementById('cust-company').value = c.company || '';
     document.getElementById('cust-contact').value = c.contact || '';
+    document.getElementById('cust-position').value = c.position || '';
     document.getElementById('cust-phone').value = c.phone || '';
     document.getElementById('cust-email').value = c.email || '';
     document.getElementById('cust-industry').value = c.industry || '';
@@ -582,6 +588,7 @@ function editCustomer(id) {
     document.getElementById('cust-owner').value = c.owner || '';
     document.getElementById('cust-address').value = c.address || '';
     document.getElementById('cust-note').value = c.note || '';
+    const sb = document.getElementById('custCompanySuggest'); if(sb) sb.style.display='none';
     const saveBtn = document.querySelector('#addCustomerModal .modal-footer .btn-primary');
     saveBtn.textContent = '保存修改';
     saveBtn.onclick = () => updateCustomer(id);
@@ -600,6 +607,7 @@ function updateCustomer(id) {
   const c = customers.find(c => c.id === id);
   if (!c) return;
   c.company = company; c.contact = contact; c.phone = phone;
+  c.position = document.getElementById('cust-position').value.trim();
   c.email = document.getElementById('cust-email').value;
   c.industry = document.getElementById('cust-industry').value;
   c.level = document.getElementById('cust-level').value;
@@ -612,7 +620,8 @@ function updateCustomer(id) {
   const saveBtn = document.querySelector('#addCustomerModal .modal-footer .btn-primary');
   saveBtn.textContent = '保存客户'; saveBtn.onclick = saveCustomer;
   document.querySelector('#addCustomerModal .modal-header h3').textContent = '新增客户';
-  ['cust-company','cust-contact','cust-phone','cust-email','cust-address','cust-note'].forEach(i => document.getElementById(i).value = '');
+  ['cust-company','cust-contact','cust-position','cust-phone','cust-email','cust-address','cust-note'].forEach(i => document.getElementById(i).value = '');
+  const sb = document.getElementById('custCompanySuggest'); if(sb) sb.style.display='none';
   showToast('客户信息已更新！'); renderPage('customers');
 }
 
@@ -627,7 +636,7 @@ function viewCustomerDetail(id) {
       <h4>基本信息</h4>
       <div class="detail-grid">
         <div class="detail-item"><label>公司名称</label><span>${c.company}</span></div>
-        <div class="detail-item"><label>联系人</label><span>${c.contact}</span></div>
+        <div class="detail-item"><label>联系人</label><span>${c.contact}${c.position ? ` <em style="color:#888;font-size:12px">（${c.position}）</em>` : ''}</span></div>
         <div class="detail-item"><label>电话</label><span>${c.phone ? `<a href="tel:${c.phone}" style="color:#1976d2">${c.phone}</a>` : '-'}</span></div>
         <div class="detail-item"><label>邮箱</label><span>${c.email || '-'}</span></div>
         <div class="detail-item"><label>行业</label><span>${c.industry}</span></div>
@@ -1765,6 +1774,140 @@ function init() {
   if (DB.get('customers').length === 0 && DB.get('leads').length === 0) {
     initDemoData();
   }
+}
+
+// ============ 客户名称模糊搜索 & 重复校验 ============
+function searchExistingCustomer(val) {
+  const box = document.getElementById('custCompanySuggest');
+  if (!box) return;
+  if (!val || val.trim().length < 1) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  const kw = val.trim();
+  const customers = DB.get('customers');
+  const leads = DB.get('leads');
+  // 模糊匹配（忽略大小写）
+  const matchedC = customers.filter(c => c.company.includes(kw));
+  const matchedL = leads.filter(l => l.company.includes(kw));
+  if (matchedC.length === 0 && matchedL.length === 0) { box.style.display = 'none'; return; }
+  const items = [
+    ...matchedC.map(c => ({ label: `<span class="suggest-tag suggest-customer">客户</span>${c.company}`, name: c.company, type: 'customer' })),
+    ...matchedL.slice(0,3).map(l => ({ label: `<span class="suggest-tag suggest-lead">线索</span>${l.company}`, name: l.company, type: 'lead' }))
+  ].slice(0, 6);
+  box.innerHTML = items.map(item => `
+    <div class="suggest-item" onclick="selectExistingCompany('${item.name.replace(/'/g,'&#39;')}', '${item.type}')">
+      ${item.label}
+    </div>`).join('');
+  box.style.display = 'block';
+}
+
+function selectExistingCompany(name, type) {
+  const box = document.getElementById('custCompanySuggest');
+  if (box) box.style.display = 'none';
+  if (type === 'customer') {
+    showToast(`"${name}" 已是现有客户，如需修改请在客户列表中编辑`, 'error');
+    document.getElementById('cust-company').value = '';
+  } else {
+    // 线索可以选择填入，提示用户
+    document.getElementById('cust-company').value = name;
+    showToast(`"${name}" 目前为线索，确认后可保存为客户`, 'info');
+  }
+}
+
+// 点击 modal 其他区域隐藏建议框
+document.addEventListener('click', function(e) {
+  const box = document.getElementById('custCompanySuggest');
+  const input = document.getElementById('cust-company');
+  if (box && input && !input.contains(e.target) && !box.contains(e.target)) {
+    box.style.display = 'none';
+  }
+});
+
+// ============ 苹果日历 (.ics) 导出 ============
+function openCalendarExport() {
+  const followups = DB.get('followups').filter(f => f.nextdate);
+  const container = document.getElementById('calendarExportList');
+  if (!container) return;
+  if (followups.length === 0) {
+    container.innerHTML = '<div style="color:#bbb;text-align:center;padding:20px">暂无跟进提醒记录</div>';
+  } else {
+    // 按日期升序排列
+    const sorted = [...followups].sort((a,b) => a.nextdate.localeCompare(b.nextdate));
+    container.innerHTML = sorted.map(f => `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#f8f9ff;border-radius:8px;gap:8px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:14px;font-weight:600;color:#1a237e;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${f.customerName}</div>
+          <div style="font-size:12px;color:#888;margin-top:2px">${f.type} · ${f.nextdate}</div>
+          ${f.goal ? `<div style="font-size:12px;color:#1976d2;margin-top:2px">目标：${f.goal}</div>` : ''}
+        </div>
+        <button onclick="exportSingleFollowup('${f.id}')" style="flex-shrink:0;padding:6px 12px;border-radius:6px;border:1px solid #1976d2;color:#1976d2;background:#fff;font-size:12px;cursor:pointer;white-space:nowrap">
+          <i class="fas fa-download"></i> 导出
+        </button>
+      </div>`).join('');
+  }
+  openModal('exportCalendarModal');
+}
+
+function buildIcsContent(events) {
+  const pad = n => String(n).padStart(2,'0');
+  const toIcsDate = (dateStr) => {
+    const d = new Date(dateStr + 'T09:00:00');
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T090000`;
+  };
+  const toIcsDateEnd = (dateStr) => {
+    const d = new Date(dateStr + 'T10:00:00');
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T100000`;
+  };
+  const esc = s => (s||'').replace(/,/g,'\\,').replace(/;/g,'\\;').replace(/\n/g,'\\n');
+  const stamp = (() => { const n=new Date(); return `${n.getFullYear()}${pad(n.getMonth()+1)}${pad(n.getDate())}T${pad(n.getHours())}${pad(n.getMinutes())}${pad(n.getSeconds())}Z`; })();
+  const vevents = events.map(e => [
+    'BEGIN:VEVENT',
+    `UID:crm-${e.id}@crmsystem`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;TZID=Asia/Shanghai:${toIcsDate(e.nextdate)}`,
+    `DTEND;TZID=Asia/Shanghai:${toIcsDateEnd(e.nextdate)}`,
+    `SUMMARY:【跟进提醒】${esc(e.customerName)} - ${esc(e.type)}`,
+    `DESCRIPTION:客户：${esc(e.customerName)}\\n方式：${esc(e.type)}${e.goal?'\\n目标：'+esc(e.goal):''}${e.content?'\\n内容：'+esc(e.content):''}`,
+    'BEGIN:VALARM',
+    'TRIGGER:-PT30M',
+    'ACTION:DISPLAY',
+    `DESCRIPTION:跟进提醒：${esc(e.customerName)}`,
+    'END:VALARM',
+    'END:VEVENT'
+  ].join('\r\n')).join('\r\n');
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//CRM System//ZH',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:CRM跟进提醒',
+    'X-WR-TIMEZONE:Asia/Shanghai',
+    vevents,
+    'END:VCALENDAR'
+  ].join('\r\n');
+}
+
+function downloadIcs(content, filename) {
+  const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
+
+function exportSingleFollowup(id) {
+  const f = DB.get('followups').find(f => f.id === id);
+  if (!f) return;
+  downloadIcs(buildIcsContent([f]), `跟进提醒_${f.customerName}_${f.nextdate}.ics`);
+  showToast('日历文件已下载，用iPhone打开即可添加到日历');
+}
+
+function exportAllFollowupsToCalendar() {
+  const followups = DB.get('followups').filter(f => f.nextdate);
+  if (followups.length === 0) { showToast('暂无跟进提醒可导出', 'error'); return; }
+  downloadIcs(buildIcsContent(followups), `CRM跟进提醒_全部_${new Date().toISOString().split('T')[0]}.ics`);
+  showToast(`已导出 ${followups.length} 条跟进提醒到日历文件`);
 }
 
 function initDemoData() {
