@@ -204,13 +204,45 @@
     <div id="page-opportunities" class="page">
       <div class="page-actions">
         <button class="btn btn-primary" onclick="openModal('addOppModal')"><i class="fas fa-plus"></i> 新增商机</button>
+        <div class="opp-toolbar">
+          <div class="opp-search-wrap">
+            <i class="fas fa-search opp-search-icon"></i>
+            <input type="text" id="oppSearchInput" placeholder="搜索商机名称/客户..." oninput="renderOpportunitiesWithFilter()">
+          </div>
+          <select id="oppStageFilter" onchange="renderOpportunitiesWithFilter()" class="opp-filter-select">
+            <option value="">全部阶段</option>
+            <option value="needs_analysis">需求分析</option>
+            <option value="demo">演示交流</option>
+            <option value="proposal">方案提交</option>
+            <option value="negotiation">商务谈判</option>
+            <option value="won">成交</option>
+            <option value="lost">失败</option>
+          </select>
+          <div class="opp-view-btns">
+            <button class="opp-view-btn active" id="btnKanban" onclick="switchOppView('kanban')" title="看板视图"><i class="fas fa-columns"></i></button>
+            <button class="opp-view-btn" id="btnList" onclick="switchOppView('list')" title="列表视图"><i class="fas fa-list"></i></button>
+          </div>
+        </div>
       </div>
+      <!-- 看板视图 -->
       <div class="kanban-board" id="oppKanban">
         <div class="kanban-col"><div class="kanban-col-header needs-analysis">需求分析</div><div class="kanban-items" id="kanban-needs_analysis"></div></div>
+        <div class="kanban-col"><div class="kanban-col-header demo">演示交流</div><div class="kanban-items" id="kanban-demo"></div></div>
         <div class="kanban-col"><div class="kanban-col-header proposal">方案提交</div><div class="kanban-items" id="kanban-proposal"></div></div>
         <div class="kanban-col"><div class="kanban-col-header negotiation">商务谈判</div><div class="kanban-items" id="kanban-negotiation"></div></div>
         <div class="kanban-col"><div class="kanban-col-header won">成交</div><div class="kanban-items" id="kanban-won"></div></div>
         <div class="kanban-col"><div class="kanban-col-header lost">失败</div><div class="kanban-items" id="kanban-lost"></div></div>
+      </div>
+      <!-- 列表视图（仅电脑端可见） -->
+      <div id="oppListView" style="display:none">
+        <div class="card">
+          <div class="table-container">
+            <table class="data-table">
+              <thead><tr><th>商机名称</th><th>关联客户</th><th>阶段</th><th>预计金额</th><th>负责人</th><th>预计成交日期</th><th>操作</th></tr></thead>
+              <tbody id="oppListBody"><tr><td colspan="7" class="empty-row">暂无商机数据</td></tr></tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -339,6 +371,28 @@
             </div>
           </div>
         </div>
+
+        <!-- 工商查询API配置 -->
+        <div class="card settings-card" style="grid-column:1/-1">
+          <div class="card-header"><h3><i class="fas fa-building"></i> 全国工商数据查询配置</h3></div>
+          <div class="settings-body" style="padding:16px">
+            <p style="font-size:13px;color:#666;margin-bottom:12px">
+              配置工商查询API Token后，新增客户时可实时搜索全国工商注册企业（支持陌生客户检索）。<br>
+              推荐使用 <a href="https://xxapi.cn" target="_blank" style="color:#1976d2">xxapi.cn</a> 注册免费账号获取 Token。
+            </p>
+            <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+              <div class="form-group" style="flex:1;min-width:200px;margin-bottom:0">
+                <label>工商查询 API Token</label>
+                <input type="text" id="bizApiTokenInput" placeholder="粘贴您的 API Token">
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="saveBizApiToken()"><i class="fas fa-save"></i> 保存</button>
+              <button class="btn btn-outline btn-sm" onclick="testBizApiToken()"><i class="fas fa-plug"></i> 测试连接</button>
+            </div>
+            <div id="bizApiStatus" style="margin-top:8px;font-size:12px;color:#888"></div>
+          </div>
+        </div>
+
+        <!-- 团队成员 -->
 
         <!-- 团队成员 -->
         <div class="card settings-card">
@@ -482,7 +536,9 @@
       <div class="form-group"><label>预计金额（万元）</label><input type="number" id="opp-amount" placeholder="预计合同金额"></div>
       <div class="form-group"><label>阶段</label>
         <select id="opp-stage">
-          <option value="needs_analysis">需求分析</option><option value="proposal">方案提交</option>
+          <option value="needs_analysis">需求分析</option>
+          <option value="demo">演示交流</option>
+          <option value="proposal">方案提交</option>
           <option value="negotiation">商务谈判</option><option value="won">成交</option><option value="lost">失败</option>
         </select>
       </div>
@@ -512,6 +568,11 @@
 <div class="modal" id="addContractModal">
   <div class="modal-header"><h3>上传合同</h3><button onclick="closeModal('addContractModal')"><i class="fas fa-times"></i></button></div>
   <div class="modal-body">
+    <!-- 来源商机提示（商机跳转建立合同时显示） -->
+    <div id="contractFromOppTip" style="display:none;background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#2e7d32">
+      <i class="fas fa-link"></i> 来自商机：<strong id="contractFromOppName"></strong>
+    </div>
+    <input type="hidden" id="contract-opp-id">
     <div class="form-grid">
       <div class="form-group"><label>合同编号 *</label><input type="text" id="contract-no" placeholder="如：HT-2026-001"></div>
       <div class="form-group"><label>关联客户 *</label><select id="contract-customer"><option value="">请选择客户</option></select></div>
