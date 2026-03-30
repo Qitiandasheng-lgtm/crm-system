@@ -52,6 +52,60 @@ function renderSettings() {
   });
   const tipEl = document.getElementById('accountSecurityTip');
   if (tipEl) tipEl.textContent = '用户名和密码可分别单独修改，不填则不改';
+  // 显示工商API Token
+  const bizTokenEl = document.getElementById('bizApiTokenInput');
+  if (bizTokenEl) {
+    const settings = getSettings();
+    bizTokenEl.value = settings.bizApiToken || '';
+    bizTokenEl.placeholder = settings.bizApiToken ? '已配置（点击修改）' : '粘贴您的 API Token';
+  }
+  const bizStatusEl = document.getElementById('bizApiStatus');
+  if (bizStatusEl) {
+    const settings = getSettings();
+    bizStatusEl.textContent = settings.bizApiToken ? '✅ 工商查询已启用，新增客户时可实时搜索全国工商企业' : '⚠️ 未配置 Token，新增客户仅搜索本地已有数据';
+    bizStatusEl.style.color = settings.bizApiToken ? '#388e3c' : '#e65100';
+  }
+}
+
+// 保存工商API Token
+function saveBizApiToken() {
+  const token = document.getElementById('bizApiTokenInput')?.value.trim() || '';
+  const settings = getSettings();
+  settings.bizApiToken = token;
+  saveSettings(settings);
+  const statusEl = document.getElementById('bizApiStatus');
+  if (token) {
+    if (statusEl) { statusEl.textContent = '✅ Token 已保存！新增客户时可搜索全国工商企业'; statusEl.style.color = '#388e3c'; }
+    showToast('工商API Token 已保存');
+  } else {
+    if (statusEl) { statusEl.textContent = '⚠️ 已清除 Token，将仅使用本地数据搜索'; statusEl.style.color = '#e65100'; }
+    showToast('已清除工商API Token');
+  }
+}
+
+// 测试工商API Token连通性
+function testBizApiToken() {
+  const token = document.getElementById('bizApiTokenInput')?.value.trim() || '';
+  const statusEl = document.getElementById('bizApiStatus');
+  if (!token) { showToast('请先填入 Token', 'error'); return; }
+  if (statusEl) { statusEl.textContent = '🔄 测试连接中...'; statusEl.style.color = '#1976d2'; }
+  const url = `https://api.xxapi.cn/company/search?token=${encodeURIComponent(token)}&keyword=华为技术&pageNo=1&pageSize=1`;
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      if (data && (data.code === 200 || data.code === 0 || data.success)) {
+        if (statusEl) { statusEl.textContent = '✅ 连接成功！API 可正常使用'; statusEl.style.color = '#388e3c'; }
+        showToast('工商API 连接成功！');
+      } else {
+        const msg = data?.msg || data?.message || 'Token无效或余额不足';
+        if (statusEl) { statusEl.textContent = `❌ 连接失败：${msg}`; statusEl.style.color = '#e53935'; }
+        showToast('连接失败：' + msg, 'error');
+      }
+    })
+    .catch(e => {
+      if (statusEl) { statusEl.textContent = `❌ 网络错误：可能存在跨域限制，请确认服务可用`; statusEl.style.color = '#e53935'; }
+      showToast('网络请求失败', 'error');
+    });
 }
 
 // 保存账号安全（修改用户名/密码）
@@ -178,8 +232,14 @@ function daysDiff(dateStr) {
 }
 
 function getStageLabel(stage) {
-  const map = { needs_analysis:'需求分析', proposal:'方案提交', negotiation:'商务谈判', won:'成交', lost:'失败' };
+  const map = { needs_analysis:'需求分析', demo:'演示交流', proposal:'方案提交', negotiation:'商务谈判', won:'成交', lost:'失败' };
   return map[stage] || stage;
+}
+
+// 获取阶段对应的标签颜色
+function getStageTagHtml(stage) {
+  const colorMap = { needs_analysis:'tag-purple', demo:'tag-blue', proposal:'tag-orange', negotiation:'tag-orange', won:'tag-green', lost:'tag-gray' };
+  return `<span class="tag ${colorMap[stage]||'tag-gray'}">${getStageLabel(stage)}</span>`;
 }
 
 function getStatusTag(status) {
@@ -674,9 +734,51 @@ function viewCustomerDetail(id) {
 }
 
 // ============ 商机管理 ============
+// 当前视图模式: 'kanban' | 'list'
+let oppViewMode = 'kanban';
+
+function switchOppView(mode) {
+  oppViewMode = mode;
+  const kanban = document.getElementById('oppKanban');
+  const listView = document.getElementById('oppListView');
+  const btnKanban = document.getElementById('btnKanban');
+  const btnList = document.getElementById('btnList');
+  if (mode === 'kanban') {
+    if (kanban) kanban.style.display = '';
+    if (listView) listView.style.display = 'none';
+    if (btnKanban) btnKanban.classList.add('active');
+    if (btnList) btnList.classList.remove('active');
+  } else {
+    if (kanban) kanban.style.display = 'none';
+    if (listView) listView.style.display = '';
+    if (btnKanban) btnKanban.classList.remove('active');
+    if (btnList) btnList.classList.add('active');
+  }
+  renderOpportunitiesWithFilter();
+}
+
+function renderOpportunitiesWithFilter() {
+  const keyword = (document.getElementById('oppSearchInput')?.value || '').trim().toLowerCase();
+  const stageFilter = document.getElementById('oppStageFilter')?.value || '';
+  const allOpps = DB.get('opportunities');
+  const filtered = allOpps.filter(o => {
+    const matchKeyword = !keyword || (o.name||'').toLowerCase().includes(keyword) || (o.customerName||'').toLowerCase().includes(keyword);
+    const matchStage = !stageFilter || o.stage === stageFilter;
+    return matchKeyword && matchStage;
+  });
+  if (oppViewMode === 'list') {
+    renderOppList(filtered);
+  } else {
+    renderOppKanban(filtered);
+  }
+}
+
 function renderOpportunities() {
-  const opps = DB.get('opportunities');
-  ['needs_analysis','proposal','negotiation','won','lost'].forEach(stage => {
+  renderOpportunitiesWithFilter();
+}
+
+function renderOppKanban(opps) {
+  ['needs_analysis','demo','proposal','negotiation','won','lost'].forEach(stage => {
     const container = document.getElementById('kanban-' + stage);
     if (!container) return;
     const stageOpps = opps.filter(o => o.stage === stage);
@@ -688,8 +790,30 @@ function renderOpportunities() {
           <div class="kanban-card-meta">${o.customerName || '未关联客户'} · ${o.owner}</div>
           ${o.amount ? `<div class="kanban-card-amount">¥${o.amount}万</div>` : ''}
           ${o.closedate ? `<div class="kanban-card-meta" style="margin-top:4px"><i class="fas fa-calendar" style="font-size:10px"></i> ${formatDate(o.closedate)}</div>` : ''}
+          ${stage === 'won' ? `<div style="margin-top:6px"><button class="btn btn-sm" style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:12px;padding:3px 8px" onclick="event.stopPropagation();createContractFromOpp('${o.id}')"><i class="fas fa-file-contract"></i> 建立合同</button></div>` : ''}
+          ${stage === 'lost' ? `<button class="btn btn-sm btn-danger" style="margin-top:6px;font-size:12px;padding:3px 8px;width:100%" onclick="event.stopPropagation();deleteOpp('${o.id}')"><i class="fas fa-trash"></i> 删除</button>` : ''}
         </div>`).join('');
   });
+}
+
+function renderOppList(opps) {
+  const tbody = document.getElementById('oppListBody');
+  if (!tbody) return;
+  if (opps.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="empty-row">暂无商机数据</td></tr>'; return; }
+  tbody.innerHTML = opps.map(o => `<tr>
+    <td><strong style="cursor:pointer;color:#1976d2" onclick="viewOppDetail('${o.id}')">${o.name}</strong></td>
+    <td>${o.customerName || '-'}</td>
+    <td>${getStageTagHtml(o.stage)}</td>
+    <td style="color:#388e3c;font-weight:600">${o.amount ? '¥'+o.amount+'万' : '-'}</td>
+    <td>${o.owner || '-'}</td>
+    <td>${formatDate(o.closedate)}</td>
+    <td>
+      <button class="action-btn view" onclick="viewOppDetail('${o.id}')" title="查看"><i class="fas fa-eye"></i></button>
+      <button class="action-btn edit" onclick="editOpp('${o.id}')" title="编辑"><i class="fas fa-edit"></i></button>
+      ${o.stage === 'won' ? `<button class="action-btn" style="color:#388e3c" onclick="createContractFromOpp('${o.id}')" title="建立合同"><i class="fas fa-file-contract"></i></button>` : ''}
+      ${o.stage === 'lost' ? `<button class="action-btn del" onclick="deleteOpp('${o.id}')" title="删除"><i class="fas fa-trash"></i></button>` : ''}
+    </td>
+  </tr>`).join('');
 }
 
 function addNeedItem() {
@@ -774,14 +898,16 @@ function viewOppDetail(id) {
     ${opp.note ? `<div class="detail-section"><h4>备注</h4><p style="font-size:13px;color:#555">${opp.note}</p></div>` : ''}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
       ${opp.stage !== 'won' && opp.stage !== 'lost' ? `<button class="btn btn-primary btn-sm" onclick="moveOppStage('${opp.id}');closeModal('detailModal')"><i class="fas fa-arrow-right"></i> 推进阶段</button>` : ''}
+      ${opp.stage === 'won' ? `<button class="btn btn-sm" style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7" onclick="closeModal('detailModal');createContractFromOpp('${opp.id}')"><i class="fas fa-file-contract"></i> 建立合同</button>` : ''}
       <button class="btn btn-outline btn-sm" onclick="editOpp('${opp.id}')"><i class="fas fa-edit"></i> 编辑商机</button>
-      <button class="btn btn-danger btn-sm" onclick="markOppLost('${opp.id}');closeModal('detailModal')"><i class="fas fa-times"></i> 标记失败</button>
+      ${opp.stage !== 'lost' ? `<button class="btn btn-danger btn-sm" onclick="markOppLost('${opp.id}');closeModal('detailModal')"><i class="fas fa-times"></i> 标记失败</button>` : ''}
+      ${opp.stage === 'lost' ? `<button class="btn btn-danger btn-sm" onclick="deleteOpp('${opp.id}');closeModal('detailModal')"><i class="fas fa-trash"></i> 删除商机</button>` : ''}
     </div>`;
   openModal('detailModal');
 }
 
 function moveOppStage(id) {
-  const stageOrder = ['needs_analysis','proposal','negotiation','won'];
+  const stageOrder = ['needs_analysis','demo','proposal','negotiation','won'];
   const opps = DB.get('opportunities');
   const opp = opps.find(o => o.id === id);
   if (!opp) return;
@@ -799,6 +925,46 @@ function markOppLost(id) {
   const opps = DB.get('opportunities');
   const opp = opps.find(o => o.id === id);
   if (opp) { opp.stage = 'lost'; DB.set('opportunities', opps); addActivity(`商机失败：${opp.name}`, 'fas fa-times'); renderPage('opportunities'); }
+}
+
+function deleteOpp(id) {
+  if (!confirm('确认删除此商机？此操作不可恢复。')) return;
+  DB.set('opportunities', DB.get('opportunities').filter(o => o.id !== id));
+  showToast('商机已删除');
+  renderPage('opportunities');
+}
+
+// 商机成交后跳转建立合同
+function createContractFromOpp(id) {
+  const opp = DB.get('opportunities').find(o => o.id === id);
+  if (!opp) return;
+  refreshAllSelects();
+  // 填充合同客户
+  const custSel = document.getElementById('contract-customer');
+  if (custSel && opp.customerId) {
+    const customers = DB.get('customers');
+    custSel.innerHTML = '<option value="">请选择客户</option>' + customers.map(c => `<option value="${c.id}">${c.company}</option>`).join('');
+    // 找出纯ID（去掉前缀）
+    const rawId = opp.customerId.replace('cust_','').replace('lead_','');
+    const custMatch = customers.find(c => c.id === opp.customerId || c.id === rawId);
+    if (custMatch) custSel.value = custMatch.id;
+  }
+  // 预填金额
+  const amtEl = document.getElementById('contract-amount');
+  if (amtEl && opp.amount) amtEl.value = opp.amount;
+  // 预填今日日期
+  const dateEl = document.getElementById('contract-date');
+  if (dateEl) dateEl.value = new Date().toISOString().split('T')[0];
+  // 显示来源商机提示
+  const tipDiv = document.getElementById('contractFromOppTip');
+  const tipName = document.getElementById('contractFromOppName');
+  if (tipDiv) tipDiv.style.display = '';
+  if (tipName) tipName.textContent = opp.name;
+  // 记录来源商机ID
+  const oppIdInput = document.getElementById('contract-opp-id');
+  if (oppIdInput) oppIdInput.value = opp.id;
+  // 切换到合同页
+  openModal('addContractModal');
 }
 
 function editOpp(id) {
@@ -901,6 +1067,7 @@ function saveContract() {
   const custId = document.getElementById('contract-customer').value;
   const found = DB.get('customers').find(c => c.id === custId);
   const fileName = document.getElementById('contractFile').files[0]?.name || '';
+  const fromOppId = document.getElementById('contract-opp-id')?.value || '';
   const contract = {
     id: DB.genId(), no, amount, customerId: custId,
     customerName: found ? found.company : '',
@@ -908,6 +1075,7 @@ function saveContract() {
     status: document.getElementById('contract-status').value,
     owner: document.getElementById('contract-owner').value,
     note: document.getElementById('contract-note').value,
+    fromOppId,
     invoiceTitle: document.getElementById('contract-invoice-title').value.trim(),
     invoiceTaxNo: document.getElementById('contract-invoice-taxno').value.trim(),
     invoiceBank: document.getElementById('contract-invoice-bank').value.trim(),
@@ -919,7 +1087,11 @@ function saveContract() {
   const contracts = DB.get('contracts'); contracts.push(contract); DB.set('contracts', contracts);
   addActivity(`上传合同：${no}（¥${amount}万）`, 'fas fa-file-contract');
   closeModal('addContractModal');
-  // 清空发票字段
+  _clearContractModal();
+  showToast('合同保存成功！'); renderPage('contracts');
+}
+
+function _clearContractModal() {
   ['contract-no','contract-amount','contract-note','contract-invoice-title','contract-invoice-taxno','contract-invoice-bank','contract-invoice-account','contract-invoice-address','contract-invoice-phone'].forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
   const pasteArea = document.getElementById('invoicePasteArea');
   if (pasteArea) pasteArea.value = '';
@@ -929,7 +1101,11 @@ function saveContract() {
   if (prevImg) { prevImg.src = ''; prevImg.style.display = 'none'; }
   const ocrStatus = document.getElementById('invoiceOcrStatus');
   if (ocrStatus) ocrStatus.textContent = '';
-  showToast('合同保存成功！'); renderPage('contracts');
+  // 清除来源商机提示
+  const tipDiv = document.getElementById('contractFromOppTip');
+  if (tipDiv) tipDiv.style.display = 'none';
+  const oppIdInput = document.getElementById('contract-opp-id');
+  if (oppIdInput) oppIdInput.value = '';
 }
 
 function deleteContract(id) {
@@ -1776,27 +1952,97 @@ function init() {
   }
 }
 
-// ============ 客户名称模糊搜索 & 重复校验 ============
+// ============ 客户名称模糊搜索 & 工商数据对接 & 重复校验 ============
+
+// 工商搜索防抖定时器
+let _bizSearchTimer = null;
+
 function searchExistingCustomer(val) {
   const box = document.getElementById('custCompanySuggest');
   if (!box) return;
   if (!val || val.trim().length < 1) { box.style.display = 'none'; box.innerHTML = ''; return; }
   const kw = val.trim();
+
+  // 先展示本地已有客户/线索
+  _renderLocalSuggest(box, kw);
+
+  // 防抖调用工商API（输入停顿400ms后触发）
+  clearTimeout(_bizSearchTimer);
+  _bizSearchTimer = setTimeout(() => _fetchBizSuggest(box, kw), 400);
+}
+
+function _renderLocalSuggest(box, kw) {
   const customers = DB.get('customers');
   const leads = DB.get('leads');
-  // 模糊匹配（忽略大小写）
   const matchedC = customers.filter(c => c.company.includes(kw));
   const matchedL = leads.filter(l => l.company.includes(kw));
-  if (matchedC.length === 0 && matchedL.length === 0) { box.style.display = 'none'; return; }
-  const items = [
-    ...matchedC.map(c => ({ label: `<span class="suggest-tag suggest-customer">客户</span>${c.company}`, name: c.company, type: 'customer' })),
+  const localItems = [
+    ...matchedC.map(c => ({ label: `<span class="suggest-tag suggest-customer">已有客户</span>${c.company}`, name: c.company, type: 'customer' })),
     ...matchedL.slice(0,3).map(l => ({ label: `<span class="suggest-tag suggest-lead">线索</span>${l.company}`, name: l.company, type: 'lead' }))
   ].slice(0, 6);
-  box.innerHTML = items.map(item => `
-    <div class="suggest-item" onclick="selectExistingCompany('${item.name.replace(/'/g,'&#39;')}', '${item.type}')">
-      ${item.label}
-    </div>`).join('');
-  box.style.display = 'block';
+  // 先占位显示本地结果
+  box.innerHTML = localItems.length > 0
+    ? localItems.map(item => `<div class="suggest-item" onclick="selectExistingCompany('${item.name.replace(/'/g,'&#39;')}', '${item.type}')">${item.label}</div>`).join('')
+    : '';
+  // 如果有工商Token，附加一个loading行
+  const settings = DB.getObj('settings', DEFAULT_SETTINGS);
+  if (settings.bizApiToken) {
+    box.innerHTML += `<div class="suggest-item suggest-loading" id="bizSearchLoading"><i class="fas fa-spinner fa-spin"></i> 查询全国工商数据中...</div>`;
+  }
+  if (box.innerHTML) box.style.display = 'block';
+}
+
+// 调用工商查询API（需用户在系统设置中配置token）
+function _fetchBizSuggest(box, kw) {
+  const settings = DB.getObj('settings', DEFAULT_SETTINGS);
+  const token = settings.bizApiToken;
+  if (!token) return; // 未配置token则不调用
+
+  // 使用 xxapi.cn 的企业名称搜索接口（用户需自行注册获取token）
+  // API文档: https://xxapi.cn/doc/companySearch
+  const url = `https://api.xxapi.cn/company/search?token=${encodeURIComponent(token)}&keyword=${encodeURIComponent(kw)}&pageNo=1&pageSize=8`;
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      // 清除loading行
+      const loadingEl = document.getElementById('bizSearchLoading');
+      if (loadingEl) loadingEl.remove();
+      if (!box.isConnected) return;
+
+      const list = data?.data?.list || data?.result?.list || data?.data || [];
+      if (!Array.isArray(list) || list.length === 0) return;
+
+      // 获取已有本地数据公司名
+      const existingNames = new Set([
+        ...DB.get('customers').map(c => c.company),
+        ...DB.get('leads').map(l => l.company)
+      ]);
+
+      const bizItems = list
+        .filter(item => {
+          const name = item.name || item.companyName || item.company_name || '';
+          return name && !existingNames.has(name);
+        })
+        .slice(0, 5)
+        .map(item => {
+          const name = item.name || item.companyName || item.company_name || '';
+          const status = item.regStatus || item.operatingStatus || '';
+          return `<div class="suggest-item" onclick="selectExistingCompany('${name.replace(/'/g,'&#39;')}', 'biz')">
+            <span class="suggest-tag suggest-biz">工商</span>${name}
+            ${status ? `<span style="font-size:11px;color:#888;margin-left:6px">${status}</span>` : ''}
+          </div>`;
+        });
+
+      if (bizItems.length > 0) {
+        box.innerHTML += bizItems.join('');
+        box.style.display = 'block';
+      }
+    })
+    .catch(() => {
+      const loadingEl = document.getElementById('bizSearchLoading');
+      if (loadingEl) loadingEl.remove();
+    });
 }
 
 function selectExistingCompany(name, type) {
@@ -1805,10 +2051,13 @@ function selectExistingCompany(name, type) {
   if (type === 'customer') {
     showToast(`"${name}" 已是现有客户，如需修改请在客户列表中编辑`, 'error');
     document.getElementById('cust-company').value = '';
-  } else {
-    // 线索可以选择填入，提示用户
+  } else if (type === 'lead') {
     document.getElementById('cust-company').value = name;
     showToast(`"${name}" 目前为线索，确认后可保存为客户`, 'info');
+  } else {
+    // 工商数据：直接填入，允许保存为新客户
+    document.getElementById('cust-company').value = name;
+    showToast(`已填入：${name}`, 'success');
   }
 }
 
