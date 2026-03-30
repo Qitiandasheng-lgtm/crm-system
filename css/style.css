@@ -131,10 +131,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 .tag-purple { background: #f3e5f5; color: #6a1b9a; }
 
 /* ============ 看板 ============ */
-.kanban-board { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
-.kanban-col { min-width: 180px; background: #f8f9ff; border-radius: 10px; overflow: hidden; }
+.kanban-board { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.kanban-col { min-width: 160px; background: #f8f9ff; border-radius: 10px; overflow: hidden; }
 .kanban-col-header { padding: 12px 14px; font-weight: 600; font-size: 13px; color: #fff; }
 .kanban-col-header.needs-analysis { background: #5c6bc0; }
+.kanban-col-header.demo { background: #26a69a; }
 .kanban-col-header.proposal { background: #42a5f5; }
 .kanban-col-header.negotiation { background: #ffa726; }
 .kanban-col-header.won { background: #66bb6a; }
@@ -145,6 +146,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 .kanban-card-title { font-size: 13px; font-weight: 600; margin-bottom: 6px; }
 .kanban-card-meta { font-size: 12px; color: #999; }
 .kanban-card-amount { font-size: 13px; color: #388e3c; font-weight: 600; margin-top: 6px; }
+
+/* ============ 商机工具栏 ============ */
+.opp-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.opp-search-wrap { position: relative; display: flex; align-items: center; }
+.opp-search-icon { position: absolute; left: 10px; color: #bbb; font-size: 13px; pointer-events: none; }
+.opp-search-wrap input { padding: 7px 12px 7px 32px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; width: 180px; outline: none; transition: border 0.2s; }
+.opp-search-wrap input:focus { border-color: #1976d2; }
+.opp-filter-select { padding: 7px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; outline: none; background: #fff; }
+.opp-view-btns { display: flex; gap: 4px; }
+.opp-view-btn { width: 34px; height: 34px; border: 1px solid #ddd; border-radius: 6px; background: #fff; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #999; font-size: 14px; transition: all 0.15s; }
+.opp-view-btn:hover { border-color: #1976d2; color: #1976d2; }
+.opp-view-btn.active { background: #1976d2; border-color: #1976d2; color: #fff; }
+/* 手机端隐藏列表视图按钮 */
+@media (max-width: 768px) {
+  .opp-view-btns { display: none; }
+  .opp-search-wrap input { width: 130px; }
+}
 
 /* ============ 跟进列表 ============ */
 .followup-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -513,6 +531,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 }
 .suggest-customer { background: #e8f5e9; color: #2e7d32; }
 .suggest-lead { background: #fff3e0; color: #e65100; }
+.suggest-biz { background: #e3f2fd; color: #1565c0; }
+.suggest-loading { color: #888; font-size: 12px; justify-content: center; }
+
 
 
 
@@ -559,6 +580,9 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC'
 .invoice-img-upload i { font-size: 16px; }
 
 /* ============ 响应式 ============ */
+@media (max-width: 1200px) {
+  .kanban-board { grid-template-columns: repeat(3, 1fr); }
+}
 @media (max-width: 1024px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
   .kanban-board { grid-template-columns: repeat(3, 1fr); }
