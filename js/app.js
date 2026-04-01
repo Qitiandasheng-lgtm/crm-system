@@ -52,23 +52,6 @@ function renderSettings() {
   });
   const tipEl = document.getElementById('accountSecurityTip');
   if (tipEl) tipEl.textContent = '用户名和密码可分别单独修改，不填则不改';
-  // 工商查询状态提示
-  const bizStatusEl = document.getElementById('bizApiStatus');
-  if (bizStatusEl) {
-    bizStatusEl.textContent = '✅ 新增客户输入公司名时，下拉框自动显示"工商官网查询"直达链接';
-    bizStatusEl.style.color = '#388e3c';
-  }
-}
-
-// 保存工商API Token（已改为官网直达模式，函数保留兼容）
-function saveBizApiToken() {
-  showToast('工商查询已改为官网直达模式，无需配置Token');
-}
-
-// 打开国家工商官网查询
-function testBizApiToken() {
-  window.open('https://www.gsxt.gov.cn/index.html', '_blank');
-  showToast('已打开国家企业信用信息公示系统');
 }
 
 // 保存账号安全（修改用户名/密码）
@@ -1915,26 +1898,13 @@ function init() {
   }
 }
 
-// ============ 客户名称模糊搜索 & 工商数据对接 & 重复校验 ============
-
-// 工商搜索防抖定时器
-let _bizSearchTimer = null;
+// ============ 客户名称模糊搜索 & 重复校验 ============
 
 function searchExistingCustomer(val) {
   const box = document.getElementById('custCompanySuggest');
   if (!box) return;
   if (!val || val.trim().length < 1) { box.style.display = 'none'; box.innerHTML = ''; return; }
   const kw = val.trim();
-
-  // 先展示本地已有客户/线索
-  _renderLocalSuggest(box, kw);
-
-  // 防抖调用工商API（输入停顿400ms后触发）
-  clearTimeout(_bizSearchTimer);
-  _bizSearchTimer = setTimeout(() => _fetchBizSuggest(box, kw), 400);
-}
-
-function _renderLocalSuggest(box, kw) {
   const customers = DB.get('customers');
   const leads = DB.get('leads');
   const matchedC = customers.filter(c => c.company.includes(kw));
@@ -1943,23 +1913,13 @@ function _renderLocalSuggest(box, kw) {
     ...matchedC.map(c => ({ label: `<span class="suggest-tag suggest-customer">已有客户</span>${c.company}`, name: c.company, type: 'customer' })),
     ...matchedL.slice(0,3).map(l => ({ label: `<span class="suggest-tag suggest-lead">线索</span>${l.company}`, name: l.company, type: 'lead' }))
   ].slice(0, 6);
-  // 显示本地结果
-  box.innerHTML = localItems.length > 0
-    ? localItems.map(item => `<div class="suggest-item" onclick="selectExistingCompany('${item.name.replace(/'/g,'&#39;')}', '${item.type}')">${item.label}</div>`).join('')
-    : '';
-  // 始终追加"在工商官网查询"快捷入口
-  const encKw = encodeURIComponent(kw);
-  box.innerHTML += `<div class="suggest-item suggest-biz-link" onclick="window.open('https://www.gsxt.gov.cn/corp-query-search-1.html#${encKw}','_blank')">
-    <span class="suggest-tag suggest-biz">工商官网</span>🔍 查询"${kw}"的工商注册信息
-    <span style="font-size:11px;color:#888;margin-left:4px">→ 国家企业信用公示系统</span>
-  </div>`;
-  box.style.display = 'block';
-}
-
-// 工商API查询（保留兼容，已不依赖跨域API）
-function _fetchBizSuggest(box, kw) {
-  // 跨域限制导致第三方工商API无法在浏览器端直接调用
-  // 已改为在建议列表中提供工商官网直达链接
+  if (localItems.length > 0) {
+    box.innerHTML = localItems.map(item => `<div class="suggest-item" onclick="selectExistingCompany('${item.name.replace(/'/g,'&#39;')}', '${item.type}')">${item.label}</div>`).join('');
+    box.style.display = 'block';
+  } else {
+    box.style.display = 'none';
+    box.innerHTML = '';
+  }
 }
 
 function selectExistingCompany(name, type) {
