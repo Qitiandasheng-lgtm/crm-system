@@ -52,60 +52,23 @@ function renderSettings() {
   });
   const tipEl = document.getElementById('accountSecurityTip');
   if (tipEl) tipEl.textContent = '用户名和密码可分别单独修改，不填则不改';
-  // 显示工商API Token
-  const bizTokenEl = document.getElementById('bizApiTokenInput');
-  if (bizTokenEl) {
-    const settings = getSettings();
-    bizTokenEl.value = settings.bizApiToken || '';
-    bizTokenEl.placeholder = settings.bizApiToken ? '已配置（点击修改）' : '粘贴您的 API Token';
-  }
+  // 工商查询状态提示
   const bizStatusEl = document.getElementById('bizApiStatus');
   if (bizStatusEl) {
-    const settings = getSettings();
-    bizStatusEl.textContent = settings.bizApiToken ? '✅ 工商查询已启用，新增客户时可实时搜索全国工商企业' : '⚠️ 未配置 Token，新增客户仅搜索本地已有数据';
-    bizStatusEl.style.color = settings.bizApiToken ? '#388e3c' : '#e65100';
+    bizStatusEl.textContent = '✅ 新增客户输入公司名时，下拉框自动显示"工商官网查询"直达链接';
+    bizStatusEl.style.color = '#388e3c';
   }
 }
 
-// 保存工商API Token
+// 保存工商API Token（已改为官网直达模式，函数保留兼容）
 function saveBizApiToken() {
-  const token = document.getElementById('bizApiTokenInput')?.value.trim() || '';
-  const settings = getSettings();
-  settings.bizApiToken = token;
-  saveSettings(settings);
-  const statusEl = document.getElementById('bizApiStatus');
-  if (token) {
-    if (statusEl) { statusEl.textContent = '✅ Token 已保存！新增客户时可搜索全国工商企业'; statusEl.style.color = '#388e3c'; }
-    showToast('工商API Token 已保存');
-  } else {
-    if (statusEl) { statusEl.textContent = '⚠️ 已清除 Token，将仅使用本地数据搜索'; statusEl.style.color = '#e65100'; }
-    showToast('已清除工商API Token');
-  }
+  showToast('工商查询已改为官网直达模式，无需配置Token');
 }
 
-// 测试工商API Token连通性
+// 打开国家工商官网查询
 function testBizApiToken() {
-  const token = document.getElementById('bizApiTokenInput')?.value.trim() || '';
-  const statusEl = document.getElementById('bizApiStatus');
-  if (!token) { showToast('请先填入 Token', 'error'); return; }
-  if (statusEl) { statusEl.textContent = '🔄 测试连接中...'; statusEl.style.color = '#1976d2'; }
-  const url = `https://api.xxapi.cn/company/search?token=${encodeURIComponent(token)}&keyword=华为技术&pageNo=1&pageSize=1`;
-  fetch(url)
-    .then(r => r.json())
-    .then(data => {
-      if (data && (data.code === 200 || data.code === 0 || data.success)) {
-        if (statusEl) { statusEl.textContent = '✅ 连接成功！API 可正常使用'; statusEl.style.color = '#388e3c'; }
-        showToast('工商API 连接成功！');
-      } else {
-        const msg = data?.msg || data?.message || 'Token无效或余额不足';
-        if (statusEl) { statusEl.textContent = `❌ 连接失败：${msg}`; statusEl.style.color = '#e53935'; }
-        showToast('连接失败：' + msg, 'error');
-      }
-    })
-    .catch(e => {
-      if (statusEl) { statusEl.textContent = `❌ 网络错误：可能存在跨域限制，请确认服务可用`; statusEl.style.color = '#e53935'; }
-      showToast('网络请求失败', 'error');
-    });
+  window.open('https://www.gsxt.gov.cn/index.html', '_blank');
+  showToast('已打开国家企业信用信息公示系统');
 }
 
 // 保存账号安全（修改用户名/密码）
@@ -1980,69 +1943,23 @@ function _renderLocalSuggest(box, kw) {
     ...matchedC.map(c => ({ label: `<span class="suggest-tag suggest-customer">已有客户</span>${c.company}`, name: c.company, type: 'customer' })),
     ...matchedL.slice(0,3).map(l => ({ label: `<span class="suggest-tag suggest-lead">线索</span>${l.company}`, name: l.company, type: 'lead' }))
   ].slice(0, 6);
-  // 先占位显示本地结果
+  // 显示本地结果
   box.innerHTML = localItems.length > 0
     ? localItems.map(item => `<div class="suggest-item" onclick="selectExistingCompany('${item.name.replace(/'/g,'&#39;')}', '${item.type}')">${item.label}</div>`).join('')
     : '';
-  // 如果有工商Token，附加一个loading行
-  const settings = DB.getObj('settings', DEFAULT_SETTINGS);
-  if (settings.bizApiToken) {
-    box.innerHTML += `<div class="suggest-item suggest-loading" id="bizSearchLoading"><i class="fas fa-spinner fa-spin"></i> 查询全国工商数据中...</div>`;
-  }
-  if (box.innerHTML) box.style.display = 'block';
+  // 始终追加"在工商官网查询"快捷入口
+  const encKw = encodeURIComponent(kw);
+  box.innerHTML += `<div class="suggest-item suggest-biz-link" onclick="window.open('https://www.gsxt.gov.cn/corp-query-search-1.html#${encKw}','_blank')">
+    <span class="suggest-tag suggest-biz">工商官网</span>🔍 查询"${kw}"的工商注册信息
+    <span style="font-size:11px;color:#888;margin-left:4px">→ 国家企业信用公示系统</span>
+  </div>`;
+  box.style.display = 'block';
 }
 
-// 调用工商查询API（需用户在系统设置中配置token）
+// 工商API查询（保留兼容，已不依赖跨域API）
 function _fetchBizSuggest(box, kw) {
-  const settings = DB.getObj('settings', DEFAULT_SETTINGS);
-  const token = settings.bizApiToken;
-  if (!token) return; // 未配置token则不调用
-
-  // 使用 xxapi.cn 的企业名称搜索接口（用户需自行注册获取token）
-  // API文档: https://xxapi.cn/doc/companySearch
-  const url = `https://api.xxapi.cn/company/search?token=${encodeURIComponent(token)}&keyword=${encodeURIComponent(kw)}&pageNo=1&pageSize=8`;
-
-  fetch(url)
-    .then(r => r.json())
-    .then(data => {
-      // 清除loading行
-      const loadingEl = document.getElementById('bizSearchLoading');
-      if (loadingEl) loadingEl.remove();
-      if (!box.isConnected) return;
-
-      const list = data?.data?.list || data?.result?.list || data?.data || [];
-      if (!Array.isArray(list) || list.length === 0) return;
-
-      // 获取已有本地数据公司名
-      const existingNames = new Set([
-        ...DB.get('customers').map(c => c.company),
-        ...DB.get('leads').map(l => l.company)
-      ]);
-
-      const bizItems = list
-        .filter(item => {
-          const name = item.name || item.companyName || item.company_name || '';
-          return name && !existingNames.has(name);
-        })
-        .slice(0, 5)
-        .map(item => {
-          const name = item.name || item.companyName || item.company_name || '';
-          const status = item.regStatus || item.operatingStatus || '';
-          return `<div class="suggest-item" onclick="selectExistingCompany('${name.replace(/'/g,'&#39;')}', 'biz')">
-            <span class="suggest-tag suggest-biz">工商</span>${name}
-            ${status ? `<span style="font-size:11px;color:#888;margin-left:6px">${status}</span>` : ''}
-          </div>`;
-        });
-
-      if (bizItems.length > 0) {
-        box.innerHTML += bizItems.join('');
-        box.style.display = 'block';
-      }
-    })
-    .catch(() => {
-      const loadingEl = document.getElementById('bizSearchLoading');
-      if (loadingEl) loadingEl.remove();
-    });
+  // 跨域限制导致第三方工商API无法在浏览器端直接调用
+  // 已改为在建议列表中提供工商官网直达链接
 }
 
 function selectExistingCompany(name, type) {
