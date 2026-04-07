@@ -1733,14 +1733,6 @@ function parseCardText(text) {
     }
   }
 }
-    company: document.getElementById('card-company').value.trim(),
-    phone: document.getElementById('card-phone').value.trim(),
-    email: document.getElementById('card-email').value.trim(),
-    industry: document.getElementById('card-industry').value,
-    address: document.getElementById('card-address').value.trim(),
-    note: document.getElementById('card-note').value.trim()
-  };
-}
 
 function saveCardAsLead() {
   const data = getCardData();
