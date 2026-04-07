@@ -52,8 +52,7 @@ function renderSettings() {
   });
   const tipEl = document.getElementById('accountSecurityTip');
   if (tipEl) tipEl.textContent = '用户名和密码可分别单独修改，不填则不改';
-  // 加载百度OCR配置
-  loadBaiduOcrConfig();
+  // 百度OCR已内置配置，无需手动设置
 }
 
 // 保存账号安全（修改用户名/密码）
@@ -1590,10 +1589,7 @@ function previewCardImage(event) {
     prevEl.parentNode.insertBefore(statusEl, prevEl.nextSibling);
 
     // 百度OCR结果填充到名片录入页字段
-    const settings = DB.get('settings') || {};
-    const hasBaidu = settings.baiduOcrApiKey && settings.baiduOcrSecretKey;
-
-    if (hasBaidu) {
+    if (true) {
       statusEl.textContent = '正在百度AI识别...';
       try {
         const result = await baiduOcrBusinessCard(e.target.result);
@@ -1798,56 +1794,28 @@ function parseCardText(text) {
   }
 }
 
-// ============ 百度OCR名片识别 ============
+// ============ 百度OCR名片识别（API已内置）============
+const BAIDU_OCR_API_KEY = 'iHxVtBdzof5MQYZ8wrqba5lS';
+const BAIDU_OCR_SECRET_KEY = 'bzJoeYtfk7FgM0zrdsbnVp1JQVGJuYUq';
 
-// 保存百度OCR配置
-function saveBaiduOcrConfig() {
-  const apiKey = document.getElementById('baiduOcrApiKey').value.trim();
-  const secretKey = document.getElementById('baiduOcrSecretKey').value.trim();
-  const tip = document.getElementById('baiduOcrTip');
-  if (!apiKey || !secretKey) { tip.textContent = '请填写 API Key 和 Secret Key'; tip.style.color = '#e53935'; return; }
-  const settings = DB.get('settings') || {};
-  settings.baiduOcrApiKey = apiKey;
-  settings.baiduOcrSecretKey = secretKey;
-  settings.baiduOcrToken = ''; // 清除旧token，下次自动刷新
-  settings.baiduOcrTokenExpire = 0;
-  DB.set('settings', settings);
-  tip.textContent = '保存成功'; tip.style.color = '#388e3c';
-  showToast('百度OCR配置已保存');
-}
-
-// 测试百度OCR连接
-async function testBaiduOcrConfig() {
-  const apiKey = document.getElementById('baiduOcrApiKey').value.trim();
-  const secretKey = document.getElementById('baiduOcrSecretKey').value.trim();
-  const tip = document.getElementById('baiduOcrTip');
-  if (!apiKey || !secretKey) { tip.textContent = '请先填写 API Key 和 Secret Key'; tip.style.color = '#e53935'; return; }
-  tip.textContent = '正在测试...'; tip.style.color = '#1976d2';
-  try {
-    const token = await getBaiduOcrToken(apiKey, secretKey);
-    if (token) { tip.textContent = '连接成功 ✓（Token已获取）'; tip.style.color = '#388e3c'; }
-    else { tip.textContent = '获取Token失败，请检查Key是否正确'; tip.style.color = '#e53935'; }
-  } catch (e) { tip.textContent = '连接失败：' + e.message; tip.style.color = '#e53935'; }
-}
-
-// 获取百度OCR访问令牌（带缓存）
-async function getBaiduOcrToken(apiKey, secretKey) {
-  const settings = DB.get('settings') || {};
-  const cachedToken = settings.baiduOcrToken;
-  const cachedExpire = settings.baiduOcrTokenExpire || 0;
+// 获取百度OCR访问令牌（带缓存30天）
+async function getBaiduOcrToken() {
+  const cacheKey = 'crm_baidu_ocr_token';
+  const cacheExpireKey = 'crm_baidu_ocr_token_expire';
+  const cachedToken = localStorage.getItem(cacheKey);
+  const cachedExpire = parseInt(localStorage.getItem(cacheExpireKey) || '0');
   // Token有效期30天，提前1天刷新
   if (cachedToken && cachedExpire > Date.now() + 86400000) return cachedToken;
 
   const resp = await fetch('https://aip.baidubce.com/oauth/2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'grant_type=client_credentials&client_id=' + encodeURIComponent(apiKey) + '&client_secret=' + encodeURIComponent(secretKey)
+    body: 'grant_type=client_credentials&client_id=' + encodeURIComponent(BAIDU_OCR_API_KEY) + '&client_secret=' + encodeURIComponent(BAIDU_OCR_SECRET_KEY)
   });
   const data = await resp.json();
   if (data.access_token) {
-    settings.baiduOcrToken = data.access_token;
-    settings.baiduOcrTokenExpire = Date.now() + (data.expires_in || 2592000) * 1000;
-    DB.set('settings', settings);
+    localStorage.setItem(cacheKey, data.access_token);
+    localStorage.setItem(cacheExpireKey, String(Date.now() + (data.expires_in || 2592000) * 1000));
     return data.access_token;
   }
   return null;
@@ -1855,12 +1823,7 @@ async function getBaiduOcrToken(apiKey, secretKey) {
 
 // 调用百度名片识别API
 async function baiduOcrBusinessCard(imageBase64) {
-  const settings = DB.get('settings') || {};
-  const apiKey = settings.baiduOcrApiKey;
-  const secretKey = settings.baiduOcrSecretKey;
-  if (!apiKey || !secretKey) return null;
-
-  const token = await getBaiduOcrToken(apiKey, secretKey);
+  const token = await getBaiduOcrToken();
   if (!token) return null;
 
   // 去掉 base64 前缀
@@ -1942,24 +1905,19 @@ function fillFromBaiduOcr(result, prefix) {
   }
 }
 
-// 统一的名片识别入口（优先百度API，降级Tesseract）
+// 统一的名片识别入口（百度API，降级Tesseract）
 async function recognizeCard(imageData, statusEl, prefix) {
-  const settings = DB.get('settings') || {};
-  const hasBaidu = settings.baiduOcrApiKey && settings.baiduOcrSecretKey;
-
-  if (hasBaidu) {
-    // 优先百度OCR
-    if (statusEl) { statusEl.textContent = '正在百度AI识别...'; statusEl.style.color = '#1976d2'; }
-    try {
-      const result = await baiduOcrBusinessCard(imageData);
-      if (result) {
-        fillFromBaiduOcr(result, prefix);
-        if (statusEl) { statusEl.textContent = '百度AI识别完成 ✓'; statusEl.style.color = '#388e3c'; }
-        return;
-      }
-    } catch (e) {
-      console.warn('百度OCR失败，降级到Tesseract', e);
+  // 优先百度OCR
+  if (statusEl) { statusEl.textContent = '正在百度AI识别...'; statusEl.style.color = '#1976d2'; }
+  try {
+    const result = await baiduOcrBusinessCard(imageData);
+    if (result) {
+      fillFromBaiduOcr(result, prefix);
+      if (statusEl) { statusEl.textContent = '百度AI识别完成 ✓'; statusEl.style.color = '#388e3c'; }
+      return;
     }
+  } catch (e) {
+    console.warn('百度OCR失败，降级到Tesseract', e);
   }
 
   // 降级：Tesseract 本地OCR
@@ -1977,17 +1935,8 @@ async function recognizeCard(imageData, statusEl, prefix) {
       if (statusEl) { statusEl.textContent = '识别失败，请手动填写'; statusEl.style.color = '#e53935'; }
     }
   } else {
-    if (statusEl) { statusEl.textContent = '请先在系统设置配置百度OCR API Key'; statusEl.style.color = '#e53935'; }
+    if (statusEl) { statusEl.textContent = '识别服务不可用'; statusEl.style.color = '#e53935'; }
   }
-}
-
-// 加载百度OCR配置到设置页
-function loadBaiduOcrConfig() {
-  const settings = DB.get('settings') || {};
-  const apiKeyEl = document.getElementById('baiduOcrApiKey');
-  const secretKeyEl = document.getElementById('baiduOcrSecretKey');
-  if (apiKeyEl && settings.baiduOcrApiKey) apiKeyEl.value = settings.baiduOcrApiKey;
-  if (secretKeyEl && settings.baiduOcrSecretKey) secretKeyEl.value = settings.baiduOcrSecretKey;
 }
 
 function saveCardAsLead() {
