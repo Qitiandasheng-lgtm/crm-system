@@ -1622,15 +1622,16 @@ function previewCardImage(event) {
 function fillFromBaiduOcrForCardPage(result) {
   if (!result || !result.words_result) return;
   function setVal(id, val) { if (!val) return; const el = document.getElementById(id); if (el && !el.value) el.value = val.trim(); }
-  for (const item of result.words_result) {
-    const key = (item.location || {}).key || (item.key || '').toLowerCase();
-    const val = item.words || '';
+  // 百度名片返回格式：{ "name": {"words": "张三"}, "company": {"words": "某某公司"}, ... }
+  for (const key of Object.keys(result.words_result)) {
+    const val = (result.words_result[key].words || '').trim();
+    if (!val) continue;
     switch (key) {
       case 'name': setVal('card-name', val); break;
-      case 'title': case 'position': setVal('card-title', val); break;
+      case 'position': case 'title': setVal('card-title', val); break;
       case 'company': setVal('card-company', val); break;
-      case 'phone': case 'mobile': case 'telephone': case 'cell_phone': setVal('card-phone', val); break;
-      case 'email': case 'e-mail': case 'mail': setVal('card-email', val); break;
+      case 'mobile': case 'phone': case 'tel': case 'telephone': case 'cell_phone': setVal('card-phone', val); break;
+      case 'email': setVal('card-email', val); break;
       case 'address': case 'addr': setVal('card-address', val); break;
     }
   }
@@ -1851,17 +1852,18 @@ function fillFromBaiduOcr(result, prefix) {
     if (el && !el.value) el.value = val.trim();
   }
 
-  // 百度名片返回的字段：name, title, company, phone, mobile, email, address, fax, website 等
-  for (const item of fields) {
-    const key = (item.location || {}).key || (item.key || '').toLowerCase();
-    const val = item.words || '';
+  // 百度名片返回格式：{ "name": {"words": "张三"}, "company": {"words": "某某公司"}, ... }
+  // words_result 是对象，key是字段名（英文），value.words是识别结果
+  for (const key of Object.keys(fields)) {
+    const val = (fields[key].words || '').trim();
+    if (!val) continue;
 
     switch (key) {
       case 'name':
         setVal(prefix + '-contact', val);
         break;
-      case 'title':
       case 'position':
+      case 'title':
         if (prefix === 'lead') {
           const noteEl = document.getElementById(prefix + '-note');
           if (noteEl && !noteEl.value) noteEl.value = '职位：' + val;
@@ -1870,15 +1872,14 @@ function fillFromBaiduOcr(result, prefix) {
       case 'company':
         setVal(prefix + '-company', val);
         break;
-      case 'phone':
       case 'mobile':
+      case 'phone':
+      case 'tel':
       case 'telephone':
       case 'cell_phone':
         setVal(prefix + '-phone', val);
         break;
       case 'email':
-      case 'e-mail':
-      case 'mail':
         if (prefix === 'lead') {
           const noteEl = document.getElementById(prefix + '-note');
           if (noteEl) {
