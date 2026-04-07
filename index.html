@@ -439,6 +439,29 @@
           </div>
         </div>
 
+        <!-- 百度OCR名片识别 -->
+        <div class="card settings-card">
+          <div class="card-header"><h3><i class="fas fa-brain"></i> 名片智能识别</h3></div>
+          <div class="settings-body" style="padding:16px">
+            <p style="font-size:13px;color:#888;margin-bottom:12px">接入百度AI名片识别，准确率95%+，每月1000次免费额度。</p>
+            <div style="display:flex;flex-direction:column;gap:10px">
+              <div class="form-group">
+                <label>API Key</label>
+                <input type="text" id="baiduOcrApiKey" placeholder="百度AI平台 API Key" style="font-size:13px">
+              </div>
+              <div class="form-group">
+                <label>Secret Key</label>
+                <input type="password" id="baiduOcrSecretKey" placeholder="百度AI平台 Secret Key" style="font-size:13px">
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" onclick="saveBaiduOcrConfig()"><i class="fas fa-save"></i> 保存</button>
+                <button class="btn btn-outline btn-sm" onclick="testBaiduOcrConfig()"><i class="fas fa-vial"></i> 测试连接</button>
+                <span id="baiduOcrTip" style="font-size:12px;color:#888"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 数据管理 -->
         <div class="card settings-card">
           <div class="card-header"><h3><i class="fas fa-database"></i> 数据管理</h3></div>
