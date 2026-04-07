@@ -52,6 +52,8 @@ function renderSettings() {
   });
   const tipEl = document.getElementById('accountSecurityTip');
   if (tipEl) tipEl.textContent = '用户名和密码可分别单独修改，不填则不改';
+  // 加载百度OCR配置
+  loadBaiduOcrConfig();
 }
 
 // 保存账号安全（修改用户名/密码）
@@ -1574,12 +1576,93 @@ function previewCardImage(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     document.getElementById('cardPreviewImg').src = e.target.result;
     document.getElementById('cardPreview').style.display = 'block';
     document.getElementById('cardUploadArea').style.display = 'none';
+    // 使用统一识别入口（优先百度API，降级Tesseract）
+    // 名片录入页需要创建临时状态提示
+    const statusEl = document.createElement('div');
+    statusEl.id = 'cardOcrStatus';
+    statusEl.style.cssText = 'font-size:12px;color:#1976d2;margin:8px 20px 0';
+    statusEl.textContent = '准备识别...';
+    const prevEl = document.getElementById('cardPreview');
+    prevEl.parentNode.insertBefore(statusEl, prevEl.nextSibling);
+
+    // 百度OCR结果填充到名片录入页字段
+    const settings = DB.get('settings') || {};
+    const hasBaidu = settings.baiduOcrApiKey && settings.baiduOcrSecretKey;
+
+    if (hasBaidu) {
+      statusEl.textContent = '正在百度AI识别...';
+      try {
+        const result = await baiduOcrBusinessCard(e.target.result);
+        if (result) {
+          fillFromBaiduOcrForCardPage(result);
+          statusEl.textContent = '百度AI识别完成 ✓'; statusEl.style.color = '#388e3c';
+          return;
+        }
+      } catch (err) {
+        console.warn('百度OCR失败，降级到Tesseract', err);
+      }
+    }
+
+    // 降级Tesseract
+    statusEl.textContent = '正在本地识别...'; statusEl.style.color = '#f57c00';
+    if (window.Tesseract) {
+      try {
+        const { data: { text } } = await Tesseract.recognize(e.target.result, 'chi_sim+eng', { logger: () => {} });
+        if (text && text.trim().length > 10) {
+          parseCardTextForCardPage(text);
+          statusEl.textContent = '本地识别完成，请核对'; statusEl.style.color = '#f57c00';
+        } else { statusEl.textContent = '识别结果为空，请手动填写'; statusEl.style.color = '#e53935'; }
+      } catch { statusEl.textContent = '识别失败'; statusEl.style.color = '#e53935'; }
+    } else { statusEl.textContent = '请先在系统设置配置百度OCR'; statusEl.style.color = '#e53935'; }
   };
   reader.readAsDataURL(file);
+}
+
+// 百度OCR结果填充到名片录入页
+function fillFromBaiduOcrForCardPage(result) {
+  if (!result || !result.words_result) return;
+  function setVal(id, val) { if (!val) return; const el = document.getElementById(id); if (el && !el.value) el.value = val.trim(); }
+  for (const item of result.words_result) {
+    const key = (item.location || {}).key || (item.key || '').toLowerCase();
+    const val = item.words || '';
+    switch (key) {
+      case 'name': setVal('card-name', val); break;
+      case 'title': case 'position': setVal('card-title', val); break;
+      case 'company': setVal('card-company', val); break;
+      case 'phone': case 'mobile': case 'telephone': case 'cell_phone': setVal('card-phone', val); break;
+      case 'email': case 'e-mail': case 'mail': setVal('card-email', val); break;
+      case 'address': case 'addr': setVal('card-address', val); break;
+    }
+  }
+}
+
+// Tesseract识别结果填充到名片录入页
+function parseCardTextForCardPage(text) {
+  if (!text || text.trim().length < 5) return;
+  const lines = text.split(/\n|；|;/).map(l => l.trim()).filter(Boolean);
+  const fullText = lines.join(' ');
+  function setVal(id, val) { if (!val) return; const el = document.getElementById(id); if (el && !el.value) el.value = val.trim(); }
+
+  for (const line of lines) {
+    const clean = line.replace(/^[公司名称：:\s]+/, '');
+    if ((clean.includes('有限') || clean.includes('集团') || clean.includes('股份') || clean.includes('公司')) && clean.length > 4 && clean.length < 50) {
+      setVal('card-company', clean); break;
+    }
+  }
+  for (const line of lines) {
+    const clean = line.replace(/^[姓名：:\s]+/, '');
+    if (clean.length >= 2 && clean.length <= 6 && !clean.includes('有限') && !clean.includes('公司') && !/^\d{11}$/.test(clean)) {
+      setVal('card-name', clean); break;
+    }
+  }
+  const phoneMatch = fullText.match(/1[3-9]\d{9}/);
+  if (phoneMatch) setVal('card-phone', phoneMatch[0]);
+  const emailMatch = fullText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) setVal('card-email', emailMatch[0]);
 }
 
 function clearCardForm() {
@@ -1611,7 +1694,7 @@ function previewLeadCardImage(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     const preview = document.getElementById('leadCardPreview');
     const uploadArea = document.getElementById('leadCardUploadArea');
     const previewImg = document.getElementById('leadCardPreviewImg');
@@ -1620,30 +1703,11 @@ function previewLeadCardImage(event) {
     previewImg.src = e.target.result;
     preview.style.display = 'block';
     uploadArea.style.display = 'none';
-    statusEl.textContent = '正在识别名片...';
+    statusEl.textContent = '准备识别...';
     statusEl.style.color = '#1976d2';
 
-    // 使用 Tesseract.js OCR 识别
-    if (window.Tesseract) {
-      Tesseract.recognize(e.target.result, 'chi_sim+eng', {
-        logger: () => {}
-      }).then(({ data: { text } }) => {
-        if (text && text.trim().length > 10) {
-          parseCardText(text);
-          statusEl.textContent = '识别完成，请核对信息';
-          statusEl.style.color = '#388e3c';
-        } else {
-          statusEl.textContent = '识别结果为空，请手动填写';
-          statusEl.style.color = '#f57c00';
-        }
-      }).catch(err => {
-        statusEl.textContent = '识别失败，请手动填写';
-        statusEl.style.color = '#e53935';
-      });
-    } else {
-      statusEl.textContent = 'OCR未加载，请手动填写';
-      statusEl.style.color = '#888';
-    }
+    // 使用统一识别入口（优先百度API，降级Tesseract）
+    await recognizeCard(e.target.result, statusEl, 'lead');
   };
   reader.readAsDataURL(file);
 }
@@ -1732,6 +1796,198 @@ function parseCardText(text) {
       break;
     }
   }
+}
+
+// ============ 百度OCR名片识别 ============
+
+// 保存百度OCR配置
+function saveBaiduOcrConfig() {
+  const apiKey = document.getElementById('baiduOcrApiKey').value.trim();
+  const secretKey = document.getElementById('baiduOcrSecretKey').value.trim();
+  const tip = document.getElementById('baiduOcrTip');
+  if (!apiKey || !secretKey) { tip.textContent = '请填写 API Key 和 Secret Key'; tip.style.color = '#e53935'; return; }
+  const settings = DB.get('settings') || {};
+  settings.baiduOcrApiKey = apiKey;
+  settings.baiduOcrSecretKey = secretKey;
+  settings.baiduOcrToken = ''; // 清除旧token，下次自动刷新
+  settings.baiduOcrTokenExpire = 0;
+  DB.set('settings', settings);
+  tip.textContent = '保存成功'; tip.style.color = '#388e3c';
+  showToast('百度OCR配置已保存');
+}
+
+// 测试百度OCR连接
+async function testBaiduOcrConfig() {
+  const apiKey = document.getElementById('baiduOcrApiKey').value.trim();
+  const secretKey = document.getElementById('baiduOcrSecretKey').value.trim();
+  const tip = document.getElementById('baiduOcrTip');
+  if (!apiKey || !secretKey) { tip.textContent = '请先填写 API Key 和 Secret Key'; tip.style.color = '#e53935'; return; }
+  tip.textContent = '正在测试...'; tip.style.color = '#1976d2';
+  try {
+    const token = await getBaiduOcrToken(apiKey, secretKey);
+    if (token) { tip.textContent = '连接成功 ✓（Token已获取）'; tip.style.color = '#388e3c'; }
+    else { tip.textContent = '获取Token失败，请检查Key是否正确'; tip.style.color = '#e53935'; }
+  } catch (e) { tip.textContent = '连接失败：' + e.message; tip.style.color = '#e53935'; }
+}
+
+// 获取百度OCR访问令牌（带缓存）
+async function getBaiduOcrToken(apiKey, secretKey) {
+  const settings = DB.get('settings') || {};
+  const cachedToken = settings.baiduOcrToken;
+  const cachedExpire = settings.baiduOcrTokenExpire || 0;
+  // Token有效期30天，提前1天刷新
+  if (cachedToken && cachedExpire > Date.now() + 86400000) return cachedToken;
+
+  const resp = await fetch('https://aip.baidubce.com/oauth/2.0/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'grant_type=client_credentials&client_id=' + encodeURIComponent(apiKey) + '&client_secret=' + encodeURIComponent(secretKey)
+  });
+  const data = await resp.json();
+  if (data.access_token) {
+    settings.baiduOcrToken = data.access_token;
+    settings.baiduOcrTokenExpire = Date.now() + (data.expires_in || 2592000) * 1000;
+    DB.set('settings', settings);
+    return data.access_token;
+  }
+  return null;
+}
+
+// 调用百度名片识别API
+async function baiduOcrBusinessCard(imageBase64) {
+  const settings = DB.get('settings') || {};
+  const apiKey = settings.baiduOcrApiKey;
+  const secretKey = settings.baiduOcrSecretKey;
+  if (!apiKey || !secretKey) return null;
+
+  const token = await getBaiduOcrToken(apiKey, secretKey);
+  if (!token) return null;
+
+  // 去掉 base64 前缀
+  const pureBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+
+  const resp = await fetch('https://aip.baidubce.com/rest/2.0/ocr/v1/business_card?access_token=' + token, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'image=' + encodeURIComponent(pureBase64)
+  });
+  const data = await resp.json();
+  if (data.words_result) return data;
+  return null;
+}
+
+// 百度OCR结果填充到表单（通用版，支持指定字段前缀）
+function fillFromBaiduOcr(result, prefix) {
+  if (!result || !result.words_result) return;
+  const fields = result.words_result;
+
+  // 辅助：安全设置字段
+  function setVal(id, val) {
+    if (!val) return;
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = val.trim();
+  }
+
+  // 百度名片返回的字段：name, title, company, phone, mobile, email, address, fax, website 等
+  for (const item of fields) {
+    const key = (item.location || {}).key || (item.key || '').toLowerCase();
+    const val = item.words || '';
+
+    switch (key) {
+      case 'name':
+        setVal(prefix + '-contact', val);
+        break;
+      case 'title':
+      case 'position':
+        if (prefix === 'lead') {
+          const noteEl = document.getElementById(prefix + '-note');
+          if (noteEl && !noteEl.value) noteEl.value = '职位：' + val;
+        }
+        break;
+      case 'company':
+        setVal(prefix + '-company', val);
+        break;
+      case 'phone':
+      case 'mobile':
+      case 'telephone':
+      case 'cell_phone':
+        setVal(prefix + '-phone', val);
+        break;
+      case 'email':
+      case 'e-mail':
+      case 'mail':
+        if (prefix === 'lead') {
+          const noteEl = document.getElementById(prefix + '-note');
+          if (noteEl) {
+            const existing = noteEl.value;
+            noteEl.value = existing ? existing + ' | 邮箱：' + val : '邮箱：' + val;
+          }
+        } else {
+          setVal(prefix + '-email', val);
+        }
+        break;
+      case 'address':
+      case 'addr':
+        if (prefix === 'lead') {
+          const noteEl = document.getElementById(prefix + '-note');
+          if (noteEl) {
+            const existing = noteEl.value;
+            noteEl.value = existing ? existing + ' | 地址：' + val : '地址：' + val;
+          }
+        } else {
+          setVal(prefix + '-address', val);
+        }
+        break;
+    }
+  }
+}
+
+// 统一的名片识别入口（优先百度API，降级Tesseract）
+async function recognizeCard(imageData, statusEl, prefix) {
+  const settings = DB.get('settings') || {};
+  const hasBaidu = settings.baiduOcrApiKey && settings.baiduOcrSecretKey;
+
+  if (hasBaidu) {
+    // 优先百度OCR
+    if (statusEl) { statusEl.textContent = '正在百度AI识别...'; statusEl.style.color = '#1976d2'; }
+    try {
+      const result = await baiduOcrBusinessCard(imageData);
+      if (result) {
+        fillFromBaiduOcr(result, prefix);
+        if (statusEl) { statusEl.textContent = '百度AI识别完成 ✓'; statusEl.style.color = '#388e3c'; }
+        return;
+      }
+    } catch (e) {
+      console.warn('百度OCR失败，降级到Tesseract', e);
+    }
+  }
+
+  // 降级：Tesseract 本地OCR
+  if (statusEl) { statusEl.textContent = '正在本地识别...'; statusEl.style.color = '#f57c00'; }
+  if (window.Tesseract) {
+    try {
+      const { data: { text } } = await Tesseract.recognize(imageData, 'chi_sim+eng', { logger: () => {} });
+      if (text && text.trim().length > 10) {
+        parseCardText(text);
+        if (statusEl) { statusEl.textContent = '本地识别完成，请核对信息'; statusEl.style.color = '#f57c00'; }
+      } else {
+        if (statusEl) { statusEl.textContent = '识别结果为空，请手动填写'; statusEl.style.color = '#e53935'; }
+      }
+    } catch (e) {
+      if (statusEl) { statusEl.textContent = '识别失败，请手动填写'; statusEl.style.color = '#e53935'; }
+    }
+  } else {
+    if (statusEl) { statusEl.textContent = '请先在系统设置配置百度OCR API Key'; statusEl.style.color = '#e53935'; }
+  }
+}
+
+// 加载百度OCR配置到设置页
+function loadBaiduOcrConfig() {
+  const settings = DB.get('settings') || {};
+  const apiKeyEl = document.getElementById('baiduOcrApiKey');
+  const secretKeyEl = document.getElementById('baiduOcrSecretKey');
+  if (apiKeyEl && settings.baiduOcrApiKey) apiKeyEl.value = settings.baiduOcrApiKey;
+  if (secretKeyEl && settings.baiduOcrSecretKey) secretKeyEl.value = settings.baiduOcrSecretKey;
 }
 
 function saveCardAsLead() {
