@@ -466,6 +466,27 @@
 <div class="modal" id="addLeadModal">
   <div class="modal-header"><h3>新增线索</h3><button onclick="closeModal('addLeadModal')"><i class="fas fa-times"></i></button></div>
   <div class="modal-body">
+    <!-- 名片快速录入区 -->
+    <div class="card-scan-area" style="margin-bottom:16px">
+      <div class="card-upload-compact">
+        <div id="leadCardUploadArea">
+          <i class="fas fa-id-card"></i>
+          <span>上传名片自动识别</span>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('leadCardCamera').click()"><i class="fas fa-camera"></i> 拍照</button>
+            <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('leadCardGallery').click()"><i class="fas fa-images"></i> 相册</button>
+          </div>
+          <input type="file" id="leadCardCamera" accept="image/*" capture="environment" style="display:none" onchange="previewLeadCardImage(event)">
+          <input type="file" id="leadCardGallery" accept="image/*" style="display:none" onchange="previewLeadCardImage(event)">
+        </div>
+        <div id="leadCardPreview" style="display:none">
+          <img id="leadCardPreviewImg" src="" alt="名片预览" style="max-width:100%;max-height:200px;border-radius:8px;margin-bottom:8px">
+          <div id="leadOcrStatus" style="font-size:12px;color:#1976d2;margin-bottom:4px">正在识别名片...</div>
+          <button type="button" class="btn btn-text btn-sm" onclick="clearLeadCard()"><i class="fas fa-times"></i> 清除</button>
+        </div>
+      </div>
+    </div>
+    <!-- 手动补充表单 -->
     <div class="form-grid">
       <div class="form-group"><label>公司名称 *</label><input type="text" id="lead-company" placeholder="公司名称"></div>
       <div class="form-group"><label>联系人 *</label><input type="text" id="lead-contact" placeholder="联系人姓名"></div>
