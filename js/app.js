@@ -1599,7 +1599,9 @@ function previewCardImage(event) {
           return;
         }
       } catch (err) {
-        console.warn('百度OCR失败，降级到Tesseract', err);
+        console.error('百度OCR失败:', err);
+        statusEl.textContent = '百度识别失败: ' + err.message + '，降级本地识别...';
+        statusEl.style.color = '#f57c00';
       }
     }
 
@@ -1824,20 +1826,34 @@ async function getBaiduOcrToken() {
 
 // 调用百度名片识别API
 async function baiduOcrBusinessCard(imageBase64) {
-  const token = await getBaiduOcrToken();
-  if (!token) return null;
+  let token;
+  try {
+    token = await getBaiduOcrToken();
+  } catch (e) {
+    throw new Error('获取Token失败: ' + e.message);
+  }
+  if (!token) throw new Error('获取百度Token为空，请检查API Key');
 
   // 去掉 base64 前缀
   const pureBase64 = imageBase64.replace(/^data:image\/\w+;base64,/, '');
 
-  const resp = await fetch('https://aip.baidubce.com/rest/2.0/ocr/v1/business_card?access_token=' + token, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'image=' + encodeURIComponent(pureBase64)
-  });
+  let resp;
+  try {
+    resp = await fetch('https://aip.baidubce.com/rest/2.0/ocr/v1/business_card?access_token=' + token, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'image=' + encodeURIComponent(pureBase64)
+    });
+  } catch (e) {
+    throw new Error('网络请求失败: ' + e.message);
+  }
+
   const data = await resp.json();
+  if (data.error_code) {
+    throw new Error('百度API错误(' + data.error_code + '): ' + (data.error_msg || '未知错误'));
+  }
   if (data.words_result) return data;
-  return null;
+  throw new Error('百度API未返回识别结果');
 }
 
 // 百度OCR结果填充到表单（通用版，支持指定字段前缀）
@@ -1918,7 +1934,9 @@ async function recognizeCard(imageData, statusEl, prefix) {
       return;
     }
   } catch (e) {
-    console.warn('百度OCR失败，降级到Tesseract', e);
+    console.error('百度OCR失败:', e);
+    // 显示百度API的具体错误信息
+    if (statusEl) { statusEl.textContent = '百度识别失败: ' + e.message + '，降级本地识别...'; statusEl.style.color = '#f57c00'; }
   }
 
   // 降级：Tesseract 本地OCR
