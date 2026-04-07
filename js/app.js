@@ -1606,6 +1606,142 @@ function getCardData() {
   };
 }
 
+// ============ 新增线索的名片识别 ============
+function previewLeadCardImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const preview = document.getElementById('leadCardPreview');
+    const uploadArea = document.getElementById('leadCardUploadArea');
+    const previewImg = document.getElementById('leadCardPreviewImg');
+    const statusEl = document.getElementById('leadOcrStatus');
+
+    previewImg.src = e.target.result;
+    preview.style.display = 'block';
+    uploadArea.style.display = 'none';
+    statusEl.textContent = '正在识别名片...';
+    statusEl.style.color = '#1976d2';
+
+    // 使用 Tesseract.js OCR 识别
+    if (window.Tesseract) {
+      Tesseract.recognize(e.target.result, 'chi_sim+eng', {
+        logger: () => {}
+      }).then(({ data: { text } }) => {
+        if (text && text.trim().length > 10) {
+          parseCardText(text);
+          statusEl.textContent = '识别完成，请核对信息';
+          statusEl.style.color = '#388e3c';
+        } else {
+          statusEl.textContent = '识别结果为空，请手动填写';
+          statusEl.style.color = '#f57c00';
+        }
+      }).catch(err => {
+        statusEl.textContent = '识别失败，请手动填写';
+        statusEl.style.color = '#e53935';
+      });
+    } else {
+      statusEl.textContent = 'OCR未加载，请手动填写';
+      statusEl.style.color = '#888';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearLeadCard() {
+  document.getElementById('leadCardPreview').style.display = 'none';
+  document.getElementById('leadCardUploadArea').style.display = 'block';
+  document.getElementById('leadCardPreviewImg').src = '';
+  const statusEl = document.getElementById('leadOcrStatus');
+  if (statusEl) statusEl.textContent = '';
+  const cam = document.getElementById('leadCardCamera');
+  const gal = document.getElementById('leadCardGallery');
+  if (cam) cam.value = '';
+  if (gal) gal.value = '';
+}
+
+// 解析名片文字并填充到表单
+function parseCardText(text) {
+  if (!text || text.trim().length < 5) return;
+  const lines = text.split(/\n|；|;/).map(l => l.trim()).filter(Boolean);
+  const fullText = lines.join(' ');
+
+  // 辅助：设置字段值（仅当未填写时）
+  function setField(id, val) {
+    if (!val) return;
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = val.trim();
+  }
+
+  // 1. 公司名称（包含"有限"/"集团"/"股份"/"公司"的关键词）
+  for (const line of lines) {
+    const clean = line.replace(/^[公司名称：:\s]+/, '');
+    if ((clean.includes('有限') || clean.includes('集团') || clean.includes('股份') || clean.includes('公司')) && clean.length > 4 && clean.length < 50) {
+      setField('lead-company', clean);
+      break;
+    }
+  }
+
+  // 2. 联系人姓名（通常是2-4个汉字，且不包含关键词）
+  for (const line of lines) {
+    const clean = line.replace(/^[姓名：:\s]+/, '');
+    // 排除公司名称行和手机号行
+    if (clean.length >= 2 && clean.length <= 6 && !clean.includes('有限') && !clean.includes('公司') && !clean.includes('集团') && !clean.includes('股份') && !/^\d{11}$/.test(clean)) {
+      setField('lead-contact', clean);
+      break;
+    }
+  }
+
+  // 3. 手机号（11位数字）
+  const phoneMatch = fullText.match(/1[3-9]\d{9}/);
+  if (phoneMatch) setField('lead-phone', phoneMatch[0]);
+
+  // 4. 职位/头衔
+  const positionKeywords = ['经理', '总监', '总裁', '主管', '主任', '部长', '部长', 'VP', 'CEO', 'CFO', 'CTO', 'COO'];
+  for (const line of lines) {
+    const clean = line.replace(/^[职位：:\s]+/, '');
+    for (const keyword of positionKeywords) {
+      if (clean.includes(keyword)) {
+        const noteEl = document.getElementById('lead-note');
+        if (noteEl && !noteEl.value) noteEl.value = `职位：${clean}`;
+        break;
+      }
+    }
+  }
+
+  // 5. 邮箱
+  const emailMatch = fullText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) {
+    const noteEl = document.getElementById('lead-note');
+    if (noteEl) {
+      const existingNote = noteEl.value;
+      noteEl.value = existingNote ? `${existingNote} | 邮箱：${emailMatch[0]}` : `邮箱：${emailMatch[0]}`;
+    }
+  }
+
+  // 6. 地址
+  for (const line of lines) {
+    const clean = line.replace(/^[地址：:\s]+/, '');
+    // 包含"市"/"区"/"路"/"街"/"省"且长度较长
+    if ((clean.includes('市') || clean.includes('区') || clean.includes('路') || clean.includes('街') || clean.includes('省')) && clean.length > 10 && clean.length < 80) {
+      const noteEl = document.getElementById('lead-note');
+      if (noteEl) {
+        const existingNote = noteEl.value;
+        noteEl.value = existingNote ? `${existingNote} | 地址：${clean}` : `地址：${clean}`;
+      }
+      break;
+    }
+  }
+}
+    company: document.getElementById('card-company').value.trim(),
+    phone: document.getElementById('card-phone').value.trim(),
+    email: document.getElementById('card-email').value.trim(),
+    industry: document.getElementById('card-industry').value,
+    address: document.getElementById('card-address').value.trim(),
+    note: document.getElementById('card-note').value.trim()
+  };
+}
+
 function saveCardAsLead() {
   const data = getCardData();
   if (!data.company || !data.name) { showToast('请至少填写公司名称和姓名', 'error'); return; }
