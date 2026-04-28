@@ -210,7 +210,7 @@ function getLevelTag(level) {
 const pageTitles = {
   dashboard:'工作台', leads:'线索管理', customers:'客户管理',
   opportunities:'商机管理', contracts:'合同管理', projects:'项目实施',
-  followup:'跟进提醒', maintenance:'客户维护', card:'名片录入', settings:'系统设置'
+  followup:'跟进提醒', maintenance:'客户维护', settings:'系统设置'
 };
 
 function navigateTo(page) {
@@ -223,6 +223,10 @@ function navigateTo(page) {
   document.getElementById('pageTitle').textContent = pageTitles[page] || page;
   document.getElementById('sidebar').classList.remove('mobile-open');
   document.getElementById('overlay').classList.remove('active');
+  // 同步移动端底部导航激活态
+  document.querySelectorAll('.mobile-nav-item').forEach(el => el.classList.remove('active'));
+  const mobileNavItem = document.querySelector(`.mobile-nav-item[data-page="${page}"]`);
+  if (mobileNavItem) mobileNavItem.classList.add('active');
   renderPage(page);
 }
 
@@ -290,44 +294,67 @@ function renderDashboard() {
   const opps = DB.get('opportunities');
   const contracts = DB.get('contracts');
   const followups = DB.get('followups');
+  const customers = DB.get('customers');
   const today = new Date(); today.setHours(0,0,0,0);
   const thisMonth = today.getMonth(), thisYear = today.getFullYear();
 
-  document.getElementById('stat-leads').textContent = leads.filter(l => l.status !== 'converted').length;
-  document.getElementById('stat-opps').textContent = opps.filter(o => o.stage !== 'won' && o.stage !== 'lost').length;
-
+  // KPI 卡片
+  const activeOpps = opps.filter(o => o.stage !== 'won' && o.stage !== 'lost').length;
   const monthContracts = contracts.filter(c => {
     if (!c.date) return false;
     const d = new Date(c.date);
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
-  document.getElementById('stat-contracts').textContent = monthContracts.length;
-
+  const sumContractsMonth = monthContracts.reduce((acc, c) => acc + (parseFloat(c.amount) || 0), 0);
   const todayFollowups = followups.filter(f => {
     if (!f.nextdate) return false;
     const d = new Date(f.nextdate); d.setHours(0,0,0,0);
     return d <= today;
   });
+
+  document.getElementById('stat-month-contracts').textContent = `¥${sumContractsMonth.toFixed(1)}`;
+  document.getElementById('stat-opps').textContent = activeOpps;
+  document.getElementById('stat-customers').textContent = customers.length;
   document.getElementById('stat-reminders').textContent = todayFollowups.length;
   document.getElementById('followupBadge').textContent = todayFollowups.length;
 
-  // 漏斗
-  document.getElementById('funnel-leads').textContent = leads.length;
-  document.getElementById('funnel-opps').textContent = opps.length;
-  document.getElementById('funnel-needs').textContent = opps.filter(o => ['proposal','negotiation','won'].includes(o.stage)).length;
-  document.getElementById('funnel-contracts').textContent = contracts.length;
+  // 趋势文字
+  document.getElementById('stat-month-trend').textContent = `▲ 本月 ${monthContracts.length} 笔签约`;
+
+  // 漏斗（新横向漏斗）
+  const leadsCount = leads.length;
+  const demoCount = opps.filter(o => o.stage === 'demo').length;
+  const needsCount = opps.filter(o => ['proposal','negotiation'].includes(o.stage)).length;
+  const negCount = opps.filter(o => o.stage === 'negotiation').length;
+  const wonCount = opps.filter(o => o.stage === 'won').length;
+  const maxCount = Math.max(leadsCount, 1);
+
+  const setFunnel = (id, num, color) => {
+    const bar = document.getElementById(id);
+    const numEl = document.getElementById(id + '-num');
+    if (bar) {
+      bar.textContent = num;
+      bar.style.width = Math.max(Math.round(num / maxCount * 100), num > 0 ? 14 : 0) + '%';
+      bar.style.background = color;
+    }
+    if (numEl) numEl.textContent = num;
+  };
+  setFunnel('funnel-leads', leadsCount, 'var(--info)');
+  setFunnel('funnel-demo', demoCount, 'var(--primary-400)');
+  setFunnel('funnel-needs', needsCount, 'var(--primary-500)');
+  setFunnel('funnel-negotiation', negCount, 'var(--warning)');
+  setFunnel('funnel-won', wonCount, 'var(--success)');
 
   // 金额汇总
   const sumOpps = opps.reduce((acc, o) => acc + (parseFloat(o.amount) || 0), 0);
   const sumOppsActive = opps.filter(o => !['won','lost'].includes(o.stage)).reduce((acc, o) => acc + (parseFloat(o.amount) || 0), 0);
-  const sumContractsMonth = monthContracts.reduce((acc, c) => acc + (parseFloat(c.amount) || 0), 0);
   const sumContractsTotal = contracts.reduce((acc, c) => acc + (parseFloat(c.amount) || 0), 0);
   document.getElementById('sum-opps').textContent = `¥${sumOpps.toFixed(1)}万`;
   document.getElementById('sum-opps-active').textContent = `¥${sumOppsActive.toFixed(1)}万`;
   document.getElementById('sum-contracts-month').textContent = `¥${sumContractsMonth.toFixed(1)}万`;
   document.getElementById('sum-contracts-total').textContent = `¥${sumContractsTotal.toFixed(1)}万`;
 
-  // 今日待办
+  // 今日待办（新样式）
   const el = document.getElementById('todayTasks');
   if (todayFollowups.length === 0) {
     el.innerHTML = '<div class="empty-state"><i class="fas fa-check-circle"></i> 今日暂无待跟进</div>';
@@ -335,14 +362,14 @@ function renderDashboard() {
     el.innerHTML = todayFollowups.slice(0, 6).map(f => {
       const diff = daysDiff(f.nextdate);
       const dateText = diff < 0 ? `逾期${Math.abs(diff)}天` : (diff === 0 ? '今天' : `${diff}天后`);
-      const dotClass = f.priority === 'high' ? 'high' : (f.priority === 'low' ? 'low' : 'medium');
-      return `<div class="task-item" onclick="navigateTo('followup')">
-        <div class="task-dot ${dotClass}"></div>
-        <div class="task-info">
-          <div class="task-name">${f.customerName || '未知客户'}</div>
-          <div class="task-meta">${f.type} · ${f.goal || '持续跟进'}</div>
+      const dotColor = f.priority === 'high' ? 'var(--danger)' : (f.priority === 'low' ? 'var(--success)' : 'var(--warning)');
+      return `<div class="reminder-item" onclick="navigateTo('followup')">
+        <div class="reminder-dot" style="background:${dotColor}"></div>
+        <div class="reminder-main">
+          <div class="reminder-company">${f.customerName || '未知客户'}</div>
+          <div class="reminder-desc">${f.type} · ${f.goal || '持续跟进'}</div>
         </div>
-        <div class="task-date" style="color:${diff<=0?'#f44336':'#888'}">${dateText}</div>
+        <div class="reminder-time" style="color:${diff<=0?'var(--danger)':'var(--gray-400)'}">${dateText}</div>
       </div>`;
     }).join('');
   }
@@ -740,6 +767,9 @@ function renderOppKanban(opps) {
           ${stage === 'won' ? `<div style="margin-top:6px"><button class="btn btn-sm" style="background:#e8f5e9;color:#2e7d32;border:1px solid #a5d6a7;font-size:12px;padding:3px 8px" onclick="event.stopPropagation();createContractFromOpp('${o.id}')"><i class="fas fa-file-contract"></i> 建立合同</button></div>` : ''}
           ${stage === 'lost' ? `<button class="btn btn-sm btn-danger" style="margin-top:6px;font-size:12px;padding:3px 8px;width:100%" onclick="event.stopPropagation();deleteOpp('${o.id}')"><i class="fas fa-trash"></i> 删除</button>` : ''}
         </div>`).join('');
+    // 更新列头数量徽章
+    const countEl = document.getElementById('kanban-' + stage + '-count');
+    if (countEl) countEl.textContent = stageOpps.length;
   });
 }
 

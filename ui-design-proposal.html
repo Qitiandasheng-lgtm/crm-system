@@ -1,0 +1,1780 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM 系统 · UI 设计方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* =====================================================
+   设计令牌系统 Design Tokens
+   ===================================================== */
+:root {
+  /* 主色 - 工业蓝绿（数字化工厂感） */
+  --primary-50:  #edfafa;
+  --primary-100: #d5f5f6;
+  --primary-200: #afeaec;
+  --primary-300: #7dd9da;
+  --primary-400: #16bdbd;
+  --primary-500: #0d9488;  /* 核心品牌色 */
+  --primary-600: #0b7b73;
+  --primary-700: #0a6660;
+  --primary-800: #084f4a;
+  --primary-900: #053b37;
+
+  /* 辅助色 - 暖橙（强调/预警） */
+  --accent-400: #fb923c;
+  --accent-500: #f97316;
+
+  /* 语义色 */
+  --success:  #10b981;
+  --warning:  #f59e0b;
+  --danger:   #ef4444;
+  --info:     #3b82f6;
+
+  /* 中性灰 */
+  --gray-50:  #f9fafb;
+  --gray-100: #f3f4f6;
+  --gray-200: #e5e7eb;
+  --gray-300: #d1d5db;
+  --gray-400: #9ca3af;
+  --gray-500: #6b7280;
+  --gray-600: #4b5563;
+  --gray-700: #374151;
+  --gray-800: #1f2937;
+  --gray-900: #111827;
+
+  /* 字体 */
+  --font: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+
+  /* 字号比例 */
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.25rem;
+  --text-2xl:  1.5rem;
+  --text-3xl:  1.875rem;
+  --text-4xl:  2.25rem;
+
+  /* 间距 */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 20px; --sp-6: 24px; --sp-8: 32px; --sp-10: 40px;
+  --sp-12: 48px; --sp-16: 64px;
+
+  /* 圆角 */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* 阴影 */
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.06);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,.10);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,.12);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,.16);
+
+  /* 过渡 */
+  --ease: 200ms cubic-bezier(.4,0,.2,1);
+}
+
+/* =====================================================
+   页面导航框架（仅设计稿用）
+   ===================================================== */
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: var(--font);
+  background: var(--gray-100);
+  color: var(--gray-800);
+  line-height: 1.6;
+}
+.doc-nav {
+  position: fixed; top:0; left:0; right:0; z-index:1000;
+  background: var(--gray-900);
+  padding: var(--sp-3) var(--sp-6);
+  display: flex; align-items: center; gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.doc-nav-title { color:#fff; font-weight:700; font-size:var(--text-sm); margin-right: var(--sp-4); white-space:nowrap; }
+.doc-nav a {
+  color: var(--gray-400); font-size: var(--text-xs); font-weight:500;
+  text-decoration:none; padding: var(--sp-1) var(--sp-3);
+  border-radius: var(--radius-full); border:1px solid var(--gray-700);
+  transition: var(--ease); white-space:nowrap;
+}
+.doc-nav a:hover, .doc-nav a.active { color:#fff; background: var(--primary-500); border-color: var(--primary-500); }
+.doc-body { padding-top: 56px; }
+
+/* =====================================================
+   设计规范区块
+   ===================================================== */
+.section {
+  padding: var(--sp-12) var(--sp-8);
+  max-width: 1280px; margin: 0 auto;
+}
+.section-title {
+  font-size: var(--text-2xl); font-weight:700;
+  color: var(--gray-900); margin-bottom: var(--sp-2);
+  padding-bottom: var(--sp-3); border-bottom:3px solid var(--primary-500);
+  display:inline-block;
+}
+.section-desc {
+  color: var(--gray-500); font-size: var(--text-sm);
+  margin-bottom: var(--sp-8); margin-top: var(--sp-2);
+}
+.row { display:flex; gap: var(--sp-6); flex-wrap:wrap; margin-bottom: var(--sp-6); }
+.col { flex:1; min-width:200px; }
+
+/* 颜色展示 */
+.swatch-grid { display:flex; gap: var(--sp-2); flex-wrap:wrap; }
+.swatch {
+  width:56px; height:56px; border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm); cursor:default;
+  transition: transform var(--ease);
+}
+.swatch:hover { transform:scale(1.1); }
+.swatch-label { font-size:10px; color: var(--gray-500); text-align:center; margin-top:4px; }
+
+/* 字体展示 */
+.typo-row { display:flex; flex-direction:column; gap: var(--sp-3); }
+.typo-item { display:flex; align-items:baseline; gap: var(--sp-4); }
+.typo-meta { font-size:var(--text-xs); color:var(--gray-400); width:80px; flex-shrink:0; }
+
+/* =====================================================
+   通用组件
+   ===================================================== */
+.badge {
+  display:inline-flex; align-items:center; gap:4px;
+  padding: 2px 10px; border-radius: var(--radius-full);
+  font-size: var(--text-xs); font-weight:600; letter-spacing:.3px;
+}
+.badge-green  { background:#d1fae5; color:#065f46; }
+.badge-blue   { background:#dbeafe; color:#1e40af; }
+.badge-orange { background:#ffedd5; color:#9a3412; }
+.badge-red    { background:#fee2e2; color:#991b1b; }
+.badge-gray   { background:var(--gray-100); color:var(--gray-600); }
+.badge-teal   { background:var(--primary-100); color:var(--primary-700); }
+.badge-yellow { background:#fef9c3; color:#854d0e; }
+
+.btn {
+  display:inline-flex; align-items:center; gap: var(--sp-2);
+  padding: 9px 18px; border-radius: var(--radius-md);
+  font-size: var(--text-sm); font-weight:600;
+  border:none; cursor:pointer; transition: var(--ease);
+  text-decoration:none; white-space:nowrap;
+}
+.btn-primary {
+  background: var(--primary-500); color:#fff;
+  box-shadow: 0 2px 8px rgba(13,148,136,.3);
+}
+.btn-primary:hover { background: var(--primary-600); transform:translateY(-1px); box-shadow: 0 4px 14px rgba(13,148,136,.4); }
+.btn-outline {
+  background:#fff; color: var(--primary-500);
+  border:1.5px solid var(--primary-300);
+}
+.btn-outline:hover { background: var(--primary-50); border-color: var(--primary-500); }
+.btn-ghost {
+  background:transparent; color: var(--gray-600);
+  border:1.5px solid var(--gray-200);
+}
+.btn-ghost:hover { background: var(--gray-100); }
+.btn-danger { background: var(--danger); color:#fff; }
+.btn-sm { padding: 6px 12px; font-size: var(--text-xs); }
+.btn-lg { padding: 13px 28px; font-size: var(--text-base); border-radius: var(--radius-lg); }
+.btn-icon { padding: 8px; border-radius: var(--radius-md); width:36px; height:36px; justify-content:center; }
+
+.card {
+  background:#fff; border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border:1px solid var(--gray-100);
+  overflow:hidden;
+}
+.card-hover { transition: var(--ease); }
+.card-hover:hover { box-shadow: var(--shadow-md); transform:translateY(-2px); }
+
+.input {
+  width:100%; padding: 10px 14px;
+  border:1.5px solid var(--gray-200);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm); font-family: var(--font);
+  color: var(--gray-800); background:#fff;
+  outline:none; transition: var(--ease);
+}
+.input:focus { border-color: var(--primary-400); box-shadow: 0 0 0 3px rgba(13,148,136,.12); }
+.input::placeholder { color: var(--gray-400); }
+label { font-size: var(--text-xs); font-weight:600; color: var(--gray-600); display:block; margin-bottom:5px; letter-spacing:.3px; text-transform:uppercase; }
+
+/* SVG图标（内联） */
+svg { display:inline-block; vertical-align:middle; }
+
+/* =====================================================
+   屏幕外框（模拟设备）
+   ===================================================== */
+.device-frame {
+  background: var(--gray-800);
+  border-radius: 32px;
+  padding: 12px;
+  box-shadow: var(--shadow-xl), inset 0 0 0 1px rgba(255,255,255,.1);
+  display:inline-block;
+}
+.device-screen {
+  border-radius: 22px; overflow:hidden;
+  background:#fff; position:relative;
+}
+.device-mobile { width:390px; }
+.device-mobile .device-screen { height:780px; overflow-y:auto; }
+.device-desktop { width:1100px; }
+.device-desktop .device-screen { height:680px; overflow:hidden; }
+
+/* =====================================================
+   ① 登录页设计
+   ===================================================== */
+.login-page {
+  min-height:100vh;
+  background: linear-gradient(135deg, #0a6660 0%, #0d9488 40%, #0b7b73 70%, #053b37 100%);
+  display:flex; align-items:center; justify-content:center;
+  position:relative; overflow:hidden;
+}
+.login-bg-circle {
+  position:absolute; border-radius:50%;
+  background: rgba(255,255,255,.04);
+}
+.login-bg-circle:nth-child(1) { width:600px; height:600px; top:-200px; right:-150px; }
+.login-bg-circle:nth-child(2) { width:400px; height:400px; bottom:-100px; left:-100px; }
+.login-bg-circle:nth-child(3) { width:200px; height:200px; top:50%; left:30%; }
+.login-card {
+  background: rgba(255,255,255,.97);
+  backdrop-filter: blur(20px);
+  border-radius: 24px;
+  padding: 48px 44px;
+  width: 420px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.25);
+  position:relative; z-index:1;
+}
+.login-logo {
+  display:flex; align-items:center; gap: var(--sp-3); margin-bottom: var(--sp-8);
+}
+.login-logo-icon {
+  width:48px; height:48px; border-radius:14px;
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  display:flex; align-items:center; justify-content:center;
+  box-shadow: 0 4px 14px rgba(13,148,136,.4);
+}
+.login-logo-text h1 { font-size: var(--text-xl); font-weight:800; color: var(--gray-900); }
+.login-logo-text p { font-size: var(--text-xs); color: var(--gray-500); margin-top:1px; }
+.login-form { display:flex; flex-direction:column; gap: var(--sp-5); }
+.login-field label { font-size: var(--text-xs); font-weight:700; color: var(--gray-500); margin-bottom:6px; }
+.login-input-wrap { position:relative; }
+.login-input-wrap svg { position:absolute; left:13px; top:50%; transform:translateY(-50%); color: var(--gray-400); }
+.login-input {
+  width:100%; padding: 12px 14px 12px 40px;
+  border:1.5px solid var(--gray-200); border-radius: var(--radius-md);
+  font-size: var(--text-sm); font-family: var(--font); outline:none;
+  transition: var(--ease); background: var(--gray-50); color: var(--gray-800);
+}
+.login-input:focus { border-color: var(--primary-400); background:#fff; box-shadow: 0 0 0 3px rgba(13,148,136,.12); }
+.login-btn {
+  width:100%; padding:13px; border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  color:#fff; font-size: var(--text-base); font-weight:700;
+  border:none; cursor:pointer; margin-top: var(--sp-2);
+  box-shadow: 0 4px 16px rgba(13,148,136,.35);
+  transition: var(--ease);
+  letter-spacing:.3px;
+}
+.login-btn:hover { transform:translateY(-1px); box-shadow: 0 6px 20px rgba(13,148,136,.45); }
+.login-hint { font-size: var(--text-xs); color: var(--gray-400); text-align:center; margin-top: var(--sp-2); }
+
+/* =====================================================
+   ② 主布局（电脑端）
+   ===================================================== */
+.app-layout {
+  display:flex; height:680px; background: var(--gray-50); overflow:hidden;
+}
+
+/* 侧边栏 */
+.sidebar {
+  width:220px; flex-shrink:0;
+  background: linear-gradient(180deg, #0a3d38 0%, #0d9488 100%);
+  display:flex; flex-direction:column;
+  padding: var(--sp-5) 0;
+  position:relative; overflow:hidden;
+}
+.sidebar::before {
+  content:''; position:absolute; top:-80px; right:-60px;
+  width:200px; height:200px; border-radius:50%;
+  background: rgba(255,255,255,.05);
+}
+.sidebar-logo {
+  padding: 0 var(--sp-5) var(--sp-6);
+  display:flex; align-items:center; gap: var(--sp-3);
+  border-bottom:1px solid rgba(255,255,255,.1);
+  margin-bottom: var(--sp-4);
+}
+.sidebar-logo-icon {
+  width:36px; height:36px; border-radius:10px;
+  background: rgba(255,255,255,.2);
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px;
+}
+.sidebar-logo-text { color:#fff; font-size:var(--text-base); font-weight:800; letter-spacing:.5px; }
+.sidebar-logo-sub { color:rgba(255,255,255,.5); font-size:var(--text-xs); }
+
+.nav-group { padding: 0 var(--sp-3); margin-bottom: var(--sp-4); }
+.nav-group-label {
+  font-size:10px; font-weight:700; letter-spacing:1.5px;
+  color:rgba(255,255,255,.4); padding: 0 var(--sp-2) var(--sp-2);
+  text-transform:uppercase;
+}
+.nav-item {
+  display:flex; align-items:center; gap: var(--sp-3);
+  padding: 10px var(--sp-3); border-radius: var(--radius-md);
+  color:rgba(255,255,255,.7); font-size: var(--text-sm); font-weight:500;
+  cursor:pointer; transition: var(--ease); margin-bottom:2px;
+  position:relative;
+}
+.nav-item:hover { background:rgba(255,255,255,.1); color:#fff; }
+.nav-item.active {
+  background:rgba(255,255,255,.18);
+  color:#fff; font-weight:700;
+  box-shadow: inset 3px 0 0 #fff;
+}
+.nav-item .nav-badge {
+  margin-left:auto; background:var(--accent-500);
+  color:#fff; font-size:10px; font-weight:700;
+  padding:1px 6px; border-radius: var(--radius-full);
+  min-width:20px; text-align:center;
+}
+.sidebar-footer {
+  margin-top:auto; padding: var(--sp-4) var(--sp-5);
+  border-top:1px solid rgba(255,255,255,.1);
+  display:flex; align-items:center; gap: var(--sp-3);
+}
+.avatar {
+  width:32px; height:32px; border-radius:50%;
+  background: linear-gradient(135deg, #fb923c, #f97316);
+  display:flex; align-items:center; justify-content:center;
+  color:#fff; font-size:var(--text-sm); font-weight:700;
+  flex-shrink:0;
+}
+.sidebar-user-name { color:rgba(255,255,255,.9); font-size:var(--text-sm); font-weight:600; }
+.sidebar-user-role { color:rgba(255,255,255,.4); font-size:10px; }
+
+/* 主内容区 */
+.main-content { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
+
+/* 顶栏 */
+.topbar {
+  background:#fff; border-bottom:1px solid var(--gray-200);
+  padding: var(--sp-4) var(--sp-6);
+  display:flex; align-items:center; gap: var(--sp-4);
+  position:sticky; top:0; z-index:10;
+}
+.topbar-title { font-size: var(--text-xl); font-weight:800; color: var(--gray-900); flex:1; }
+.topbar-search {
+  display:flex; align-items:center; gap: var(--sp-2);
+  background: var(--gray-50); border:1.5px solid var(--gray-200);
+  border-radius: var(--radius-full); padding: 7px 14px;
+  font-size: var(--text-sm); color: var(--gray-400);
+  cursor:pointer; width:220px; transition: var(--ease);
+}
+.topbar-search:hover { border-color: var(--primary-300); background:#fff; }
+
+/* =====================================================
+   ③ 工作台 Dashboard
+   ===================================================== */
+.page-content { padding: var(--sp-6); }
+
+/* KPI 汇总条 */
+.kpi-bar {
+  display:grid; grid-template-columns:repeat(4,1fr); gap: var(--sp-4);
+  margin-bottom: var(--sp-6);
+}
+.kpi-card {
+  background:#fff; border-radius: var(--radius-lg);
+  padding: var(--sp-5); border:1px solid var(--gray-100);
+  box-shadow: var(--shadow-xs);
+  transition: var(--ease); cursor:pointer;
+  position:relative; overflow:hidden;
+}
+.kpi-card::before {
+  content:''; position:absolute; bottom:-20px; right:-20px;
+  width:80px; height:80px; border-radius:50%;
+  background: var(--kpi-color, var(--primary-100));
+  opacity:.5;
+}
+.kpi-card:hover { box-shadow: var(--shadow-md); transform:translateY(-2px); }
+.kpi-label { font-size: var(--text-xs); font-weight:700; color: var(--gray-500); letter-spacing:.5px; text-transform:uppercase; margin-bottom: var(--sp-2); }
+.kpi-value { font-size: var(--text-2xl); font-weight:800; color: var(--gray-900); line-height:1.2; }
+.kpi-value span { font-size:var(--text-sm); font-weight:500; color: var(--gray-500); }
+.kpi-trend { margin-top: var(--sp-2); font-size: var(--text-xs); font-weight:600; display:flex; align-items:center; gap:3px; }
+.kpi-trend.up { color: var(--success); }
+.kpi-trend.down { color: var(--danger); }
+.kpi-icon {
+  position:absolute; top: var(--sp-4); right: var(--sp-4);
+  width:38px; height:38px; border-radius: var(--radius-md);
+  display:flex; align-items:center; justify-content:center;
+  font-size:18px;
+}
+
+/* 图表行 */
+.chart-row { display:grid; grid-template-columns:2fr 1fr; gap: var(--sp-4); margin-bottom: var(--sp-4); }
+.chart-card { background:#fff; border-radius: var(--radius-lg); padding: var(--sp-5); border:1px solid var(--gray-100); box-shadow: var(--shadow-xs); }
+.chart-header { display:flex; align-items:center; justify-content:space-between; margin-bottom: var(--sp-4); }
+.chart-title { font-size: var(--text-base); font-weight:700; color: var(--gray-900); }
+.chart-subtitle { font-size: var(--text-xs); color: var(--gray-500); margin-top:2px; }
+
+/* 虚拟柱状图 */
+.bar-chart { display:flex; align-items:flex-end; gap: var(--sp-2); height:120px; }
+.bar-group { display:flex; flex-direction:column; align-items:center; gap:4px; flex:1; }
+.bar { border-radius: var(--radius-sm) var(--radius-sm) 0 0; width:100%; transition: var(--ease); cursor:pointer; }
+.bar:hover { opacity:.8; }
+.bar-label { font-size:10px; color: var(--gray-500); }
+
+/* 漏斗图 */
+.funnel { display:flex; flex-direction:column; gap:6px; }
+.funnel-item { display:flex; align-items:center; gap: var(--sp-3); }
+.funnel-bar-wrap { flex:1; background: var(--gray-100); border-radius: var(--radius-full); height:22px; overflow:hidden; }
+.funnel-bar { height:100%; border-radius: var(--radius-full); display:flex; align-items:center; justify-content:flex-end; padding-right:8px; font-size:10px; color:#fff; font-weight:700; transition: var(--ease); }
+.funnel-label { font-size:var(--text-xs); color: var(--gray-600); width:70px; flex-shrink:0; font-weight:500; }
+.funnel-num { font-size:var(--text-xs); color: var(--gray-500); width:30px; text-align:right; flex-shrink:0; }
+
+/* 待办提醒列表 */
+.reminder-list { display:flex; flex-direction:column; gap: var(--sp-2); }
+.reminder-item {
+  display:flex; align-items:center; gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4); background:#fff;
+  border-radius: var(--radius-md); border:1px solid var(--gray-100);
+  box-shadow: var(--shadow-xs); cursor:pointer; transition: var(--ease);
+}
+.reminder-item:hover { box-shadow: var(--shadow-sm); border-color: var(--primary-200); }
+.reminder-dot {
+  width:8px; height:8px; border-radius:50%; flex-shrink:0;
+}
+.reminder-main { flex:1; min-width:0; }
+.reminder-company { font-size: var(--text-sm); font-weight:600; color: var(--gray-800); }
+.reminder-desc { font-size: var(--text-xs); color: var(--gray-500); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.reminder-time { font-size: var(--text-xs); color: var(--gray-400); flex-shrink:0; }
+
+/* =====================================================
+   ④ 客户列表页
+   ===================================================== */
+.table-wrap { background:#fff; border-radius: var(--radius-lg); border:1px solid var(--gray-100); box-shadow: var(--shadow-xs); overflow:hidden; }
+.table-toolbar {
+  padding: var(--sp-4) var(--sp-5);
+  display:flex; align-items:center; gap: var(--sp-3);
+  border-bottom:1px solid var(--gray-100);
+  background: var(--gray-50);
+}
+.search-input {
+  display:flex; align-items:center; gap: var(--sp-2);
+  background:#fff; border:1.5px solid var(--gray-200);
+  border-radius: var(--radius-md); padding: 7px 12px;
+  font-size: var(--text-sm); color: var(--gray-400);
+  width:220px;
+}
+.filter-btn {
+  display:flex; align-items:center; gap:6px;
+  padding: 7px 12px; background:#fff; border:1.5px solid var(--gray-200);
+  border-radius: var(--radius-md); font-size: var(--text-sm);
+  color: var(--gray-600); cursor:pointer;
+}
+table { width:100%; border-collapse:collapse; }
+thead tr { background: var(--gray-50); }
+th {
+  padding: 10px 16px; text-align:left;
+  font-size: var(--text-xs); font-weight:700; color: var(--gray-500);
+  letter-spacing:.5px; text-transform:uppercase; border-bottom:1px solid var(--gray-100);
+}
+td { padding: 13px 16px; font-size: var(--text-sm); color: var(--gray-700); border-bottom:1px solid var(--gray-50); }
+tr:last-child td { border-bottom:none; }
+tbody tr { transition: var(--ease); cursor:pointer; }
+tbody tr:hover { background: var(--primary-50); }
+.td-company { font-weight:600; color: var(--gray-900); display:flex; align-items:center; gap: var(--sp-2); }
+.company-icon {
+  width:28px; height:28px; border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--primary-400), var(--primary-600));
+  color:#fff; font-size:11px; font-weight:700;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+.td-action { display:flex; gap: var(--sp-2); }
+
+/* =====================================================
+   ⑤ 商机看板
+   ===================================================== */
+.kanban-board {
+  display:flex; gap: var(--sp-4); overflow-x:auto;
+  padding-bottom: var(--sp-2); height:520px;
+}
+.kanban-col {
+  flex-shrink:0; width:210px;
+  background: var(--gray-100);
+  border-radius: var(--radius-lg); padding: var(--sp-3);
+  display:flex; flex-direction:column;
+}
+.kanban-col-header {
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom: var(--sp-3);
+}
+.kanban-col-title {
+  display:flex; align-items:center; gap: var(--sp-2);
+  font-size: var(--text-xs); font-weight:700; color: var(--gray-700);
+  text-transform:uppercase; letter-spacing:.5px;
+}
+.kanban-stage-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.kanban-col-count {
+  font-size:10px; color: var(--gray-500);
+  background: var(--gray-200); border-radius: var(--radius-full);
+  padding:1px 6px; font-weight:700;
+}
+.kanban-cards { display:flex; flex-direction:column; gap: var(--sp-2); flex:1; overflow-y:auto; }
+.kanban-card {
+  background:#fff; border-radius: var(--radius-md);
+  padding: var(--sp-3); border:1px solid var(--gray-100);
+  box-shadow: var(--shadow-xs); cursor:pointer; transition: var(--ease);
+  border-left: 3px solid var(--stage-color, var(--gray-300));
+}
+.kanban-card:hover { box-shadow: var(--shadow-sm); transform:translateY(-1px); }
+.kanban-card-title { font-size: var(--text-xs); font-weight:700; color: var(--gray-900); margin-bottom:4px; line-height:1.4; }
+.kanban-card-company { font-size:10px; color: var(--gray-500); margin-bottom: var(--sp-2); }
+.kanban-card-amount { font-size: var(--text-xs); font-weight:700; color: var(--primary-600); }
+.kanban-card-footer { display:flex; align-items:center; justify-content:space-between; margin-top: var(--sp-2); }
+.kanban-card-date { font-size:10px; color: var(--gray-400); }
+.kanban-card-avatar {
+  width:20px; height:20px; border-radius:50%;
+  background: linear-gradient(135deg, var(--info), #2563eb);
+  color:#fff; font-size:9px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/* =====================================================
+   ⑥ 移动端布局
+   ===================================================== */
+.mobile-app {
+  background: var(--gray-50);
+  min-height:780px;
+  display:flex; flex-direction:column;
+}
+.mobile-header {
+  background: linear-gradient(135deg, #0a6660, #0d9488);
+  padding: 50px 20px 20px;
+  color:#fff;
+}
+.mobile-header-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+.mobile-header-title { font-size:22px; font-weight:800; }
+.mobile-header-sub { font-size:13px; opacity:.7; margin-top:2px; }
+.mobile-avatar { width:36px; height:36px; border-radius:50%; background:rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center; font-weight:700; }
+.mobile-kpi { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+.mobile-kpi-card { background:rgba(255,255,255,.15); border-radius:12px; padding:12px; }
+.mobile-kpi-label { font-size:11px; opacity:.7; margin-bottom:4px; }
+.mobile-kpi-value { font-size:20px; font-weight:800; }
+.mobile-kpi-trend { font-size:11px; opacity:.8; margin-top:2px; }
+.mobile-content { flex:1; padding:16px; }
+.mobile-section-title { font-size:14px; font-weight:700; color: var(--gray-800); margin-bottom:10px; display:flex; align-items:center; justify-content:space-between; }
+.mobile-section-more { font-size:12px; color: var(--primary-500); font-weight:600; }
+.mobile-card {
+  background:#fff; border-radius:12px; padding:14px;
+  margin-bottom:10px; box-shadow: var(--shadow-xs);
+  border:1px solid var(--gray-100);
+}
+.mobile-card-header { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.mobile-card-icon { width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.mobile-card-title { font-size:14px; font-weight:700; color: var(--gray-900); }
+.mobile-card-sub { font-size:12px; color: var(--gray-500); }
+.mobile-card-row { display:flex; justify-content:space-between; align-items:center; }
+.mobile-card-amount { font-size:18px; font-weight:800; color: var(--primary-600); }
+.mobile-card-stage { font-size:11px; padding:3px 8px; border-radius: var(--radius-full); font-weight:600; }
+.mobile-fab {
+  position:fixed; bottom:80px; right:20px;
+  width:52px; height:52px; border-radius:50%;
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  color:#fff; display:flex; align-items:center; justify-content:center;
+  font-size:24px; box-shadow: 0 4px 16px rgba(13,148,136,.4);
+  cursor:pointer; transition: var(--ease); z-index:100;
+}
+.mobile-fab:hover { transform:scale(1.1); }
+.mobile-bottom-nav {
+  position:sticky; bottom:0;
+  background:#fff; border-top:1px solid var(--gray-100);
+  display:grid; grid-template-columns:repeat(5,1fr);
+  padding: 8px 0 20px; box-shadow: 0 -4px 16px rgba(0,0,0,.06);
+}
+.mobile-nav-item { display:flex; flex-direction:column; align-items:center; gap:3px; cursor:pointer; padding: 4px 0; transition: var(--ease); }
+.mobile-nav-icon { font-size:20px; line-height:1; }
+.mobile-nav-label { font-size:10px; font-weight:600; color: var(--gray-400); }
+.mobile-nav-item.active .mobile-nav-label { color: var(--primary-500); }
+.mobile-nav-dot { width:4px; height:4px; border-radius:50%; background: var(--primary-500); margin-top:2px; }
+
+/* =====================================================
+   ⑦ 新增客户 Modal 设计
+   ===================================================== */
+.modal-overlay {
+  background:rgba(0,0,0,.45); backdrop-filter:blur(4px);
+  display:flex; align-items:flex-start; justify-content:flex-end;
+  padding: var(--sp-4);
+}
+.modal-panel {
+  background:#fff; border-radius: var(--radius-xl);
+  width:420px; box-shadow: var(--shadow-xl);
+  overflow:hidden; max-height:600px; overflow-y:auto;
+}
+.modal-header {
+  padding: var(--sp-5) var(--sp-6);
+  background: linear-gradient(135deg, var(--primary-500), var(--primary-700));
+  color:#fff;
+  display:flex; align-items:center; justify-content:space-between;
+}
+.modal-title { font-size: var(--text-lg); font-weight:800; }
+.modal-close {
+  width:28px; height:28px; border-radius:50%;
+  background:rgba(255,255,255,.2); color:#fff;
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; font-size:16px; font-weight:700;
+  transition: var(--ease);
+}
+.modal-close:hover { background:rgba(255,255,255,.35); }
+.modal-body { padding: var(--sp-6); display:flex; flex-direction:column; gap: var(--sp-4); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap: var(--sp-4); }
+.form-group { display:flex; flex-direction:column; gap:6px; }
+.form-group label { font-size:11px; font-weight:700; color: var(--gray-500); text-transform:uppercase; letter-spacing:.5px; }
+.modal-footer { padding: var(--sp-4) var(--sp-6); border-top:1px solid var(--gray-100); display:flex; gap: var(--sp-3); justify-content:flex-end; background: var(--gray-50); }
+
+/* =====================================================
+   设计展示页框架
+   ===================================================== */
+.screen-label {
+  text-align:center; margin-bottom: var(--sp-4);
+  font-size: var(--text-xs); font-weight:700; color: var(--gray-500);
+  letter-spacing:1px; text-transform:uppercase;
+}
+.showcase-row {
+  display:flex; gap: var(--sp-8); align-items:flex-start; flex-wrap:wrap;
+  justify-content:center; padding: var(--sp-8);
+}
+.showcase-item { display:flex; flex-direction:column; align-items:center; }
+.section-bg { background: var(--gray-800); padding: var(--sp-12) var(--sp-8); }
+.section-bg .section-title { color: var(--gray-100); }
+.section-bg .section-desc { color: var(--gray-400); }
+
+/* 分割线 */
+.divider { height:1px; background: var(--gray-200); margin: var(--sp-6) 0; }
+
+/* 组件展示卡 */
+.comp-section { background:#fff; border-radius: var(--radius-lg); padding: var(--sp-6); box-shadow: var(--shadow-sm); }
+.comp-section-title { font-size: var(--text-sm); font-weight:700; color: var(--gray-600); text-transform:uppercase; letter-spacing:.5px; margin-bottom: var(--sp-4); }
+.comp-row { display:flex; align-items:center; gap: var(--sp-3); flex-wrap:wrap; margin-bottom: var(--sp-3); }
+</style>
+</head>
+<body>
+
+<!-- 顶部导航 -->
+<nav class="doc-nav">
+  <span class="doc-nav-title">🎨 CRM UI 设计方案</span>
+  <a href="#tokens" class="active">设计规范</a>
+  <a href="#login">登录页</a>
+  <a href="#dashboard">工作台</a>
+  <a href="#customers">客户列表</a>
+  <a href="#kanban">商机看板</a>
+  <a href="#mobile">移动端</a>
+  <a href="#modal">表单弹窗</a>
+  <a href="#components">组件库</a>
+</nav>
+
+<div class="doc-body">
+
+<!-- ====================================================
+     1. 设计规范
+     ==================================================== -->
+<div class="section" id="tokens">
+  <h2 class="section-title">设计规范 Design System</h2>
+  <p class="section-desc">基于「工业精准 · 数字智慧」理念，采用蓝绿主色传递专业感，暖橙强调色突出重要数据。</p>
+
+  <div class="row">
+    <!-- 色彩 -->
+    <div class="col">
+      <div class="comp-section">
+        <div class="comp-section-title">主色调 — 蓝绿 Teal</div>
+        <div class="swatch-grid">
+          <div><div class="swatch" style="background:#edfafa"></div><div class="swatch-label">50</div></div>
+          <div><div class="swatch" style="background:#afeaec"></div><div class="swatch-label">200</div></div>
+          <div><div class="swatch" style="background:#16bdbd"></div><div class="swatch-label">400</div></div>
+          <div><div class="swatch" style="background:#0d9488"></div><div class="swatch-label">500 ★</div></div>
+          <div><div class="swatch" style="background:#0b7b73"></div><div class="swatch-label">600</div></div>
+          <div><div class="swatch" style="background:#053b37"></div><div class="swatch-label">900</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="comp-section">
+        <div class="comp-section-title">语义色 & 强调色</div>
+        <div class="swatch-grid">
+          <div><div class="swatch" style="background:#10b981"></div><div class="swatch-label">成功</div></div>
+          <div><div class="swatch" style="background:#f59e0b"></div><div class="swatch-label">警告</div></div>
+          <div><div class="swatch" style="background:#ef4444"></div><div class="swatch-label">危险</div></div>
+          <div><div class="swatch" style="background:#3b82f6"></div><div class="swatch-label">信息</div></div>
+          <div><div class="swatch" style="background:#f97316"></div><div class="swatch-label">强调</div></div>
+          <div><div class="swatch" style="background:#8b5cf6"></div><div class="swatch-label">紫色</div></div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="comp-section">
+        <div class="comp-section-title">中性灰阶</div>
+        <div class="swatch-grid">
+          <div><div class="swatch" style="background:#f9fafb;border:1px solid #e5e7eb"></div><div class="swatch-label">50</div></div>
+          <div><div class="swatch" style="background:#e5e7eb"></div><div class="swatch-label">200</div></div>
+          <div><div class="swatch" style="background:#9ca3af"></div><div class="swatch-label">400</div></div>
+          <div><div class="swatch" style="background:#6b7280"></div><div class="swatch-label">500</div></div>
+          <div><div class="swatch" style="background:#374151"></div><div class="swatch-label">700</div></div>
+          <div><div class="swatch" style="background:#111827"></div><div class="swatch-label">900</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 字体 -->
+  <div class="row">
+    <div style="flex:1">
+      <div class="comp-section">
+        <div class="comp-section-title">字体比例 Typography Scale</div>
+        <div class="typo-row">
+          <div class="typo-item"><span class="typo-meta">4xl · 36px</span><span style="font-size:36px;font-weight:800;color:var(--gray-900)">数字化工厂 CRM</span></div>
+          <div class="typo-item"><span class="typo-meta">2xl · 24px</span><span style="font-size:24px;font-weight:700;color:var(--gray-900)">客户管理系统</span></div>
+          <div class="typo-item"><span class="typo-meta">xl · 20px</span><span style="font-size:20px;font-weight:600;color:var(--gray-800)">商机漏斗分析</span></div>
+          <div class="typo-item"><span class="typo-meta">base · 16px</span><span style="font-size:16px;color:var(--gray-700)">本月新增客户 12 家，同比增长 18%</span></div>
+          <div class="typo-item"><span class="typo-meta">sm · 14px</span><span style="font-size:14px;color:var(--gray-600)">上次跟进时间：2026-03-28 · 下次提醒：2026-04-05</span></div>
+          <div class="typo-item"><span class="typo-meta">xs · 12px</span><span style="font-size:12px;color:var(--gray-500)">OPPORTUNITY · STAGE · 合同金额：¥ 320,000</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     2. 登录页
+     ==================================================== -->
+<div class="section-bg" id="login">
+  <div class="section" style="padding-top:0;padding-bottom:0">
+    <h2 class="section-title" style="color:#f9fafb">登录页 Login</h2>
+    <p class="section-desc" style="color:#9ca3af">渐变背景 + 毛玻璃效果卡片，传递安全感与专业感</p>
+  </div>
+  <div class="showcase-row" style="padding-top:var(--sp-6)">
+    <div class="showcase-item">
+      <div class="login-page" style="min-height:500px;border-radius:24px;overflow:hidden;width:900px;max-width:100%">
+        <div class="login-bg-circle"></div>
+        <div class="login-bg-circle"></div>
+        <div class="login-bg-circle"></div>
+        <!-- 左侧品牌区 -->
+        <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:60px;max-width:440px;">
+          <div style="font-size:48px;font-weight:900;color:#fff;line-height:1.1;margin-bottom:16px;">
+            数字化工厂<br>客户管理
+          </div>
+          <div style="color:rgba(255,255,255,.7);font-size:15px;line-height:1.7;margin-bottom:32px;">
+            管理您的销售线索、客户关系与项目进度<br>随时随地，一手掌握
+          </div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.8);font-size:13px;">
+              <span style="font-size:18px;">✅</span> 跟进提醒
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.8);font-size:13px;">
+              <span style="font-size:18px;">📊</span> 商机看板
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.8);font-size:13px;">
+              <span style="font-size:18px;">📱</span> 手机适配
+            </div>
+          </div>
+        </div>
+        <!-- 右侧登录卡片 -->
+        <div style="display:flex;align-items:center;justify-content:center;padding:40px;flex:1;">
+          <div class="login-card">
+            <div class="login-logo">
+              <div class="login-logo-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+              </div>
+              <div class="login-logo-text">
+                <h1>CRM 系统</h1>
+                <p>数字化工厂销售管理</p>
+              </div>
+            </div>
+            <div class="login-form">
+              <div class="login-field">
+                <label>用户名</label>
+                <div class="login-input-wrap">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <input class="login-input" type="text" value="admin" placeholder="输入用户名">
+                </div>
+              </div>
+              <div class="login-field">
+                <label>密码</label>
+                <div class="login-input-wrap">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                  <input class="login-input" type="password" value="crm888" placeholder="输入密码">
+                </div>
+              </div>
+              <button class="login-btn">登 录</button>
+              <div class="login-hint">🔒 数据存储在本设备，仅供个人使用</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     3. 工作台 Dashboard
+     ==================================================== -->
+<div class="section" id="dashboard">
+  <h2 class="section-title">工作台 Dashboard</h2>
+  <p class="section-desc">一屏看清关键数据：KPI汇总、销售漏斗、待办提醒</p>
+
+  <div class="device-frame device-desktop">
+    <div class="device-screen">
+      <div class="app-layout">
+        <!-- 侧边栏 -->
+        <aside class="sidebar">
+          <div class="sidebar-logo">
+            <div class="sidebar-logo-icon">📊</div>
+            <div>
+              <div class="sidebar-logo-text">CRM</div>
+              <div class="sidebar-logo-sub">数字化工厂</div>
+            </div>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">工作台</div>
+            <div class="nav-item active">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              工作台
+            </div>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">销售</div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+              线索管理
+              <span class="nav-badge">3</span>
+            </div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              客户管理
+            </div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+              商机看板
+            </div>
+          </div>
+          <div class="nav-group">
+            <div class="nav-group-label">管理</div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              合同管理
+            </div>
+            <div class="nav-item">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              跟进提醒
+              <span class="nav-badge">5</span>
+            </div>
+          </div>
+          <div class="sidebar-footer">
+            <div class="avatar">张</div>
+            <div>
+              <div class="sidebar-user-name">张经理</div>
+              <div class="sidebar-user-role">销售总监</div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- 主内容 -->
+        <main class="main-content">
+          <div class="topbar">
+            <div class="topbar-title">工作台</div>
+            <div class="topbar-search">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              搜索客户/商机...
+            </div>
+            <button class="btn btn-primary btn-sm">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              新增
+            </button>
+            <div class="avatar" style="cursor:pointer">张</div>
+          </div>
+
+          <div class="page-content">
+            <!-- KPI 汇总 -->
+            <div class="kpi-bar">
+              <div class="kpi-card" style="--kpi-color:#d1fae5">
+                <div class="kpi-icon" style="background:#d1fae5">💰</div>
+                <div class="kpi-label">本月合同额</div>
+                <div class="kpi-value">¥ 128<span>万</span></div>
+                <div class="kpi-trend up">▲ 23% 较上月</div>
+              </div>
+              <div class="kpi-card" style="--kpi-color:#dbeafe">
+                <div class="kpi-icon" style="background:#dbeafe">📈</div>
+                <div class="kpi-label">在谈商机</div>
+                <div class="kpi-value">¥ 560<span>万</span></div>
+                <div class="kpi-trend up">▲ 8 个活跃商机</div>
+              </div>
+              <div class="kpi-card" style="--kpi-color:#ffedd5">
+                <div class="kpi-icon" style="background:#ffedd5">👥</div>
+                <div class="kpi-label">客户总数</div>
+                <div class="kpi-value">47<span> 家</span></div>
+                <div class="kpi-trend up">▲ 3 本月新增</div>
+              </div>
+              <div class="kpi-card" style="--kpi-color:#fee2e2">
+                <div class="kpi-icon" style="background:#fee2e2">⏰</div>
+                <div class="kpi-label">今日待跟进</div>
+                <div class="kpi-value">5<span> 条</span></div>
+                <div class="kpi-trend down">▼ 逾期 2 条</div>
+              </div>
+            </div>
+
+            <!-- 图表行 -->
+            <div class="chart-row">
+              <!-- 柱状图 -->
+              <div class="chart-card">
+                <div class="chart-header">
+                  <div>
+                    <div class="chart-title">月度合同趋势</div>
+                    <div class="chart-subtitle">近6个月签约金额 (万元)</div>
+                  </div>
+                  <span class="badge badge-teal">2026</span>
+                </div>
+                <div class="bar-chart">
+                  <div class="bar-group"><div class="bar" style="height:60%;background:var(--primary-200)"></div><div class="bar-label">11月</div></div>
+                  <div class="bar-group"><div class="bar" style="height:75%;background:var(--primary-200)"></div><div class="bar-label">12月</div></div>
+                  <div class="bar-group"><div class="bar" style="height:45%;background:var(--primary-300)"></div><div class="bar-label">1月</div></div>
+                  <div class="bar-group"><div class="bar" style="height:85%;background:var(--primary-400)"></div><div class="bar-label">2月</div></div>
+                  <div class="bar-group"><div class="bar" style="height:70%;background:var(--primary-500)"></div><div class="bar-label">3月</div></div>
+                  <div class="bar-group"><div class="bar" style="height:100%;background:linear-gradient(180deg,var(--primary-500),var(--primary-700))"></div><div class="bar-label" style="color:var(--primary-600);font-weight:700">4月 ✦</div></div>
+                </div>
+              </div>
+
+              <!-- 漏斗图 -->
+              <div class="chart-card">
+                <div class="chart-header">
+                  <div>
+                    <div class="chart-title">销售漏斗</div>
+                    <div class="chart-subtitle">各阶段商机数量</div>
+                  </div>
+                </div>
+                <div class="funnel">
+                  <div class="funnel-item">
+                    <div class="funnel-label">线索</div>
+                    <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:100%;background:var(--info)">18</div></div>
+                    <div class="funnel-num">18</div>
+                  </div>
+                  <div class="funnel-item">
+                    <div class="funnel-label">初步接触</div>
+                    <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:72%;background:var(--primary-400)">13</div></div>
+                    <div class="funnel-num">13</div>
+                  </div>
+                  <div class="funnel-item">
+                    <div class="funnel-label">需求分析</div>
+                    <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:50%;background:var(--primary-500)">9</div></div>
+                    <div class="funnel-num">9</div>
+                  </div>
+                  <div class="funnel-item">
+                    <div class="funnel-label">演示交流</div>
+                    <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:33%;background:#26a69a">6</div></div>
+                    <div class="funnel-num">6</div>
+                  </div>
+                  <div class="funnel-item">
+                    <div class="funnel-label">报价谈判</div>
+                    <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:22%;background:var(--warning)">4</div></div>
+                    <div class="funnel-num">4</div>
+                  </div>
+                  <div class="funnel-item">
+                    <div class="funnel-label">成交</div>
+                    <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:11%;background:var(--success)">2</div></div>
+                    <div class="funnel-num">2</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 待办提醒 -->
+            <div class="chart-header" style="margin-bottom:var(--sp-3)">
+              <div class="chart-title">今日待跟进</div>
+              <button class="btn btn-ghost btn-sm">查看全部</button>
+            </div>
+            <div class="reminder-list">
+              <div class="reminder-item">
+                <div class="reminder-dot" style="background:var(--danger)"></div>
+                <div class="reminder-main">
+                  <div class="reminder-company">深圳富联智造科技</div>
+                  <div class="reminder-desc">需要回访MES项目进展，确认采购意向</div>
+                </div>
+                <span class="badge badge-red">逾期</span>
+              </div>
+              <div class="reminder-item">
+                <div class="reminder-dot" style="background:var(--warning)"></div>
+                <div class="reminder-main">
+                  <div class="reminder-company">广州佳兴自动化</div>
+                  <div class="reminder-desc">发送报价方案后跟进反馈</div>
+                </div>
+                <div class="reminder-time">今天 14:00</div>
+              </div>
+              <div class="reminder-item">
+                <div class="reminder-dot" style="background:var(--success)"></div>
+                <div class="reminder-main">
+                  <div class="reminder-company">东莞启明工业</div>
+                  <div class="reminder-desc">季度维护拜访</div>
+                </div>
+                <div class="reminder-time">今天 16:30</div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     4. 客户列表页
+     ==================================================== -->
+<div class="section" id="customers" style="background:var(--gray-100)">
+  <h2 class="section-title">客户列表 Customer List</h2>
+  <p class="section-desc">清晰的表格布局，快速搜索过滤，状态一目了然</p>
+
+  <div style="background:#fff;border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow-md)">
+    <!-- 工具栏 -->
+    <div style="padding:var(--sp-5) var(--sp-6);display:flex;align-items:center;gap:var(--sp-3);border-bottom:1px solid var(--gray-100);">
+      <div style="font-size:var(--text-lg);font-weight:800;color:var(--gray-900);flex:1">客户管理</div>
+      <div class="search-input" style="width:240px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>搜索公司/联系人...</span>
+      </div>
+      <div class="filter-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        筛选
+      </div>
+      <button class="btn btn-primary btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        新增客户
+      </button>
+    </div>
+
+    <!-- 标签页 -->
+    <div style="padding:0 var(--sp-6);display:flex;gap:0;border-bottom:1px solid var(--gray-100);">
+      <div style="padding:12px 16px;font-size:var(--text-sm);font-weight:700;color:var(--primary-600);border-bottom:2px solid var(--primary-500);cursor:pointer;">全部客户 <span style="background:var(--primary-100);color:var(--primary-600);font-size:11px;padding:1px 6px;border-radius:99px;margin-left:4px">47</span></div>
+      <div style="padding:12px 16px;font-size:var(--text-sm);color:var(--gray-500);cursor:pointer;">重点客户</div>
+      <div style="padding:12px 16px;font-size:var(--text-sm);color:var(--gray-500);cursor:pointer;">待跟进</div>
+      <div style="padding:12px 16px;font-size:var(--text-sm);color:var(--gray-500);cursor:pointer;">老客户维护</div>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>公司名称</th>
+          <th>联系人</th>
+          <th>行业</th>
+          <th>状态</th>
+          <th>最近跟进</th>
+          <th>下次提醒</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><div class="td-company"><div class="company-icon">深</div>深圳富联智造科技有限公司</div></td>
+          <td>王总 · <span style="font-size:12px;color:var(--gray-500)">采购总监</span></td>
+          <td><span class="badge badge-teal">制造业</span></td>
+          <td><span class="badge badge-orange">跟进中</span></td>
+          <td style="color:var(--gray-500);font-size:13px">3月28日</td>
+          <td><span style="color:var(--danger);font-size:13px;font-weight:600">⚠ 今天</span></td>
+          <td><div class="td-action">
+            <button class="btn btn-outline btn-sm">跟进</button>
+            <button class="btn btn-ghost btn-sm">详情</button>
+          </div></td>
+        </tr>
+        <tr>
+          <td><div class="td-company"><div class="company-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">广</div>广州佳兴自动化设备</div></td>
+          <td>李工 · <span style="font-size:12px;color:var(--gray-500)">技术总监</span></td>
+          <td><span class="badge badge-blue">自动化</span></td>
+          <td><span class="badge badge-green">成交客户</span></td>
+          <td style="color:var(--gray-500);font-size:13px">3月25日</td>
+          <td style="color:var(--gray-500);font-size:13px">4月10日</td>
+          <td><div class="td-action">
+            <button class="btn btn-outline btn-sm">维护</button>
+            <button class="btn btn-ghost btn-sm">详情</button>
+          </div></td>
+        </tr>
+        <tr>
+          <td><div class="td-company"><div class="company-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">东</div>东莞启明工业科技</div></td>
+          <td>陈经理 · <span style="font-size:12px;color:var(--gray-500)">生产总监</span></td>
+          <td><span class="badge badge-yellow">工业</span></td>
+          <td><span class="badge badge-teal">维护中</span></td>
+          <td style="color:var(--gray-500);font-size:13px">3月20日</td>
+          <td style="color:var(--gray-500);font-size:13px">今天 16:30</td>
+          <td><div class="td-action">
+            <button class="btn btn-outline btn-sm">跟进</button>
+            <button class="btn btn-ghost btn-sm">详情</button>
+          </div></td>
+        </tr>
+        <tr>
+          <td><div class="td-company"><div class="company-icon" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">苏</div>苏州精益智能制造</div></td>
+          <td>刘总 · <span style="font-size:12px;color:var(--gray-500)">CEO</span></td>
+          <td><span class="badge badge-teal">智能制造</span></td>
+          <td><span class="badge badge-gray">待联系</span></td>
+          <td style="color:var(--gray-500);font-size:13px">3月15日</td>
+          <td style="color:var(--warning);font-size:13px;font-weight:600">明天</td>
+          <td><div class="td-action">
+            <button class="btn btn-outline btn-sm">跟进</button>
+            <button class="btn btn-ghost btn-sm">详情</button>
+          </div></td>
+        </tr>
+        <tr>
+          <td><div class="td-company"><div class="company-icon" style="background:linear-gradient(135deg,#10b981,#059669)">无</div>无锡华辰数控系统</div></td>
+          <td>赵工 · <span style="font-size:12px;color:var(--gray-500)">项目经理</span></td>
+          <td><span class="badge badge-teal">数控</span></td>
+          <td><span class="badge badge-blue">需求确认</span></td>
+          <td style="color:var(--gray-500);font-size:13px">4月1日</td>
+          <td style="color:var(--gray-500);font-size:13px">4月8日</td>
+          <td><div class="td-action">
+            <button class="btn btn-outline btn-sm">跟进</button>
+            <button class="btn btn-ghost btn-sm">详情</button>
+          </div></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- 分页 -->
+    <div style="padding:var(--sp-4) var(--sp-6);display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--gray-100);">
+      <div style="font-size:var(--text-sm);color:var(--gray-500)">共 47 条 · 第 1/10 页</div>
+      <div style="display:flex;gap:var(--sp-1)">
+        <button class="btn btn-ghost btn-sm">上一页</button>
+        <button class="btn btn-primary btn-sm">1</button>
+        <button class="btn btn-ghost btn-sm">2</button>
+        <button class="btn btn-ghost btn-sm">3</button>
+        <button class="btn btn-ghost btn-sm">下一页</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     5. 商机看板
+     ==================================================== -->
+<div class="section" id="kanban">
+  <h2 class="section-title">商机看板 Opportunity Kanban</h2>
+  <p class="section-desc">看板视图直观呈现各阶段商机，拖拽移动状态</p>
+
+  <div style="background:#fff;border-radius:var(--radius-xl);overflow:hidden;box-shadow:var(--shadow-md)">
+    <div style="padding:var(--sp-5) var(--sp-6);display:flex;align-items:center;gap:var(--sp-3);border-bottom:1px solid var(--gray-100);">
+      <div style="font-size:var(--text-lg);font-weight:800;color:var(--gray-900);flex:1">商机看板</div>
+      <div style="display:flex;gap:4px;background:var(--gray-100);border-radius:var(--radius-md);padding:3px">
+        <button class="btn btn-primary btn-sm">📋 看板</button>
+        <button class="btn btn-ghost btn-sm">☰ 列表</button>
+      </div>
+      <div class="search-input" style="width:200px">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <span>搜索商机...</span>
+      </div>
+      <button class="btn btn-primary btn-sm">+ 新建商机</button>
+    </div>
+
+    <div style="padding:var(--sp-4)">
+      <div class="kanban-board">
+        <!-- 初步接触 -->
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-title">
+              <div class="kanban-stage-dot" style="background:#3b82f6"></div>
+              初步接触
+            </div>
+            <div class="kanban-col-count">3</div>
+          </div>
+          <div class="kanban-cards">
+            <div class="kanban-card" style="--stage-color:#3b82f6">
+              <div class="kanban-card-title">MES系统部署项目</div>
+              <div class="kanban-card-company">苏州精益智能制造</div>
+              <div class="kanban-card-amount">¥ 85万</div>
+              <div class="kanban-card-footer">
+                <div class="kanban-card-date">4月5日</div>
+                <div class="kanban-card-avatar">刘</div>
+              </div>
+            </div>
+            <div class="kanban-card" style="--stage-color:#3b82f6">
+              <div class="kanban-card-title">生产线自动化改造</div>
+              <div class="kanban-card-company">南京晨星机械</div>
+              <div class="kanban-card-amount">¥ 120万</div>
+              <div class="kanban-card-footer">
+                <div class="kanban-card-date">4月8日</div>
+                <div class="kanban-card-avatar">陈</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 需求分析 -->
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-title">
+              <div class="kanban-stage-dot" style="background:var(--primary-500)"></div>
+              需求分析
+            </div>
+            <div class="kanban-col-count">2</div>
+          </div>
+          <div class="kanban-cards">
+            <div class="kanban-card" style="--stage-color:var(--primary-500)">
+              <div class="kanban-card-title">数字化车间建设</div>
+              <div class="kanban-card-company">无锡华辰数控系统</div>
+              <div class="kanban-card-amount">¥ 240万</div>
+              <div class="kanban-card-footer">
+                <div class="kanban-card-date">4月8日</div>
+                <div class="kanban-card-avatar">赵</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 演示交流 -->
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-title">
+              <div class="kanban-stage-dot" style="background:#26a69a"></div>
+              演示交流
+            </div>
+            <div class="kanban-col-count">2</div>
+          </div>
+          <div class="kanban-cards">
+            <div class="kanban-card" style="--stage-color:#26a69a">
+              <div class="kanban-card-title">MES系统升级</div>
+              <div class="kanban-card-company">广州佳兴自动化</div>
+              <div class="kanban-card-amount">¥ 68万</div>
+              <div class="kanban-card-footer">
+                <div class="kanban-card-date">今天演示</div>
+                <div class="kanban-card-avatar">李</div>
+              </div>
+            </div>
+            <div class="kanban-card" style="--stage-color:#26a69a">
+              <div class="kanban-card-title">设备联网监控平台</div>
+              <div class="kanban-card-company">杭州凌志精工</div>
+              <div class="kanban-card-amount">¥ 45万</div>
+              <div class="kanban-card-footer">
+                <div class="kanban-card-date">4月10日</div>
+                <div class="kanban-card-avatar">周</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 报价谈判 -->
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-title">
+              <div class="kanban-stage-dot" style="background:var(--warning)"></div>
+              报价谈判
+            </div>
+            <div class="kanban-col-count">2</div>
+          </div>
+          <div class="kanban-cards">
+            <div class="kanban-card" style="--stage-color:var(--warning)">
+              <div class="kanban-card-title">智能仓储管理系统</div>
+              <div class="kanban-card-company">深圳富联智造科技</div>
+              <div class="kanban-card-amount">¥ 180万</div>
+              <div class="kanban-card-footer">
+                <div class="kanban-card-date">4月12日</div>
+                <div class="kanban-card-avatar">王</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 签约 -->
+        <div class="kanban-col">
+          <div class="kanban-col-header">
+            <div class="kanban-col-title">
+              <div class="kanban-stage-dot" style="background:var(--success)"></div>
+              即将签约
+            </div>
+            <div class="kanban-col-count">1</div>
+          </div>
+          <div class="kanban-cards">
+            <div class="kanban-card" style="--stage-color:var(--success);background:linear-gradient(135deg,#f0fdf4,#fff)">
+              <div class="kanban-card-title">自动化产线改造 · Phase 2</div>
+              <div class="kanban-card-company">东莞启明工业</div>
+              <div class="kanban-card-amount" style="font-size:var(--text-base);font-weight:800">¥ 320万 🎉</div>
+              <div class="kanban-card-footer">
+                <span class="badge badge-green" style="font-size:9px">待签合同</span>
+                <div class="kanban-card-avatar" style="background:linear-gradient(135deg,var(--success),#059669)">陈</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     6. 移动端
+     ==================================================== -->
+<div class="section-bg" id="mobile">
+  <div class="section" style="padding-top:0;padding-bottom:0">
+    <h2 class="section-title" style="color:#f9fafb">移动端 Mobile</h2>
+    <p class="section-desc" style="color:#9ca3af">出差也能一手掌握，底部导航 + 渐变顶栏设计</p>
+  </div>
+  <div class="showcase-row" style="padding-top:var(--sp-6);gap:var(--sp-8)">
+
+    <!-- 工作台（移动） -->
+    <div class="showcase-item">
+      <div class="screen-label" style="color:var(--gray-400)">工作台</div>
+      <div class="device-frame device-mobile">
+        <div class="device-screen">
+          <div class="mobile-app">
+            <div class="mobile-header">
+              <div class="mobile-header-top">
+                <div>
+                  <div class="mobile-header-title">今日工作台</div>
+                  <div class="mobile-header-sub">4月2日 星期四</div>
+                </div>
+                <div class="mobile-avatar">张</div>
+              </div>
+              <div class="mobile-kpi">
+                <div class="mobile-kpi-card">
+                  <div class="mobile-kpi-label">本月合同额</div>
+                  <div class="mobile-kpi-value">¥128万</div>
+                  <div class="mobile-kpi-trend">▲ 23%</div>
+                </div>
+                <div class="mobile-kpi-card">
+                  <div class="mobile-kpi-label">今日待跟进</div>
+                  <div class="mobile-kpi-value">5条</div>
+                  <div class="mobile-kpi-trend">⚠ 2条逾期</div>
+                </div>
+              </div>
+            </div>
+            <div class="mobile-content">
+              <div class="mobile-section-title">
+                今日提醒
+                <span class="mobile-section-more">查看全部</span>
+              </div>
+              <div class="mobile-card" style="border-left:3px solid var(--danger)">
+                <div class="mobile-card-header">
+                  <div class="mobile-card-icon" style="background:#fee2e2">⚠️</div>
+                  <div>
+                    <div class="mobile-card-title">深圳富联智造科技</div>
+                    <div class="mobile-card-sub">MES项目需回访 · 逾期</div>
+                  </div>
+                  <span class="badge badge-red" style="margin-left:auto">逾期</span>
+                </div>
+              </div>
+              <div class="mobile-card">
+                <div class="mobile-card-header">
+                  <div class="mobile-card-icon" style="background:#fef9c3">📋</div>
+                  <div>
+                    <div class="mobile-card-title">广州佳兴自动化</div>
+                    <div class="mobile-card-sub">发送报价方案后跟进</div>
+                  </div>
+                  <span style="font-size:12px;color:var(--gray-500);margin-left:auto">14:00</span>
+                </div>
+              </div>
+              <div class="mobile-section-title" style="margin-top:var(--sp-4)">
+                进行中商机
+                <span class="mobile-section-more">看板</span>
+              </div>
+              <div class="mobile-card">
+                <div class="mobile-card-row" style="margin-bottom:8px">
+                  <div class="mobile-card-title">智能仓储管理系统</div>
+                  <span class="mobile-card-stage badge badge-orange">报价谈判</span>
+                </div>
+                <div style="font-size:12px;color:var(--gray-500);margin-bottom:6px">深圳富联智造科技</div>
+                <div class="mobile-card-row">
+                  <div class="mobile-card-amount">¥ 180万</div>
+                  <div style="font-size:11px;color:var(--gray-400)">4月12日跟进</div>
+                </div>
+              </div>
+            </div>
+            <div class="mobile-fab">＋</div>
+            <div class="mobile-bottom-nav">
+              <div class="mobile-nav-item active">
+                <div class="mobile-nav-icon">🏠</div>
+                <div class="mobile-nav-label" style="color:var(--primary-500)">工作台</div>
+                <div class="mobile-nav-dot"></div>
+              </div>
+              <div class="mobile-nav-item">
+                <div class="mobile-nav-icon">👥</div>
+                <div class="mobile-nav-label">客户</div>
+              </div>
+              <div class="mobile-nav-item">
+                <div class="mobile-nav-icon">📈</div>
+                <div class="mobile-nav-label">商机</div>
+              </div>
+              <div class="mobile-nav-item">
+                <div class="mobile-nav-icon">📅</div>
+                <div class="mobile-nav-label">提醒</div>
+              </div>
+              <div class="mobile-nav-item">
+                <div class="mobile-nav-icon">⚙️</div>
+                <div class="mobile-nav-label">设置</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 客户列表（移动） -->
+    <div class="showcase-item">
+      <div class="screen-label" style="color:var(--gray-400)">客户列表</div>
+      <div class="device-frame device-mobile">
+        <div class="device-screen">
+          <div class="mobile-app">
+            <div class="mobile-header" style="padding-bottom:16px">
+              <div class="mobile-header-top">
+                <div>
+                  <div class="mobile-header-title">客户管理</div>
+                  <div class="mobile-header-sub">共 47 家客户</div>
+                </div>
+                <button class="btn btn-sm" style="background:rgba(255,255,255,.2);color:#fff;border:none">+ 新增</button>
+              </div>
+              <!-- 搜索栏 -->
+              <div style="background:rgba(255,255,255,.15);border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:8px;margin-top:12px;">
+                <span style="font-size:15px">🔍</span>
+                <span style="color:rgba(255,255,255,.6);font-size:14px">搜索公司或联系人...</span>
+              </div>
+            </div>
+            <div class="mobile-content" style="padding-top:12px">
+              <!-- 分类标签 -->
+              <div style="display:flex;gap:8px;margin-bottom:14px;overflow-x:auto;padding-bottom:4px">
+                <div style="background:var(--primary-500);color:#fff;padding:5px 14px;border-radius:99px;font-size:12px;font-weight:700;white-space:nowrap">全部</div>
+                <div style="background:#fff;color:var(--gray-600);padding:5px 14px;border-radius:99px;font-size:12px;border:1px solid var(--gray-200);white-space:nowrap">跟进中</div>
+                <div style="background:#fff;color:var(--gray-600);padding:5px 14px;border-radius:99px;font-size:12px;border:1px solid var(--gray-200);white-space:nowrap">成交客户</div>
+                <div style="background:#fff;color:var(--gray-600);padding:5px 14px;border-radius:99px;font-size:12px;border:1px solid var(--gray-200);white-space:nowrap">维护中</div>
+              </div>
+              <!-- 客户卡片列表 -->
+              <div class="mobile-card">
+                <div class="mobile-card-header">
+                  <div class="mobile-card-icon" style="background:linear-gradient(135deg,var(--primary-400),var(--primary-600))">
+                    <span style="color:#fff;font-weight:800;font-size:14px">深</span>
+                  </div>
+                  <div style="flex:1">
+                    <div class="mobile-card-title">深圳富联智造科技</div>
+                    <div class="mobile-card-sub">王总 · 采购总监</div>
+                  </div>
+                  <span class="badge badge-orange">跟进中</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);margin-top:6px;padding-top:6px;border-top:1px solid var(--gray-100)">
+                  <span>📞 最近跟进：3月28日</span>
+                  <span style="color:var(--danger);font-weight:600">⚠ 今天提醒</span>
+                </div>
+              </div>
+              <div class="mobile-card">
+                <div class="mobile-card-header">
+                  <div class="mobile-card-icon" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">
+                    <span style="color:#fff;font-weight:800;font-size:14px">广</span>
+                  </div>
+                  <div style="flex:1">
+                    <div class="mobile-card-title">广州佳兴自动化</div>
+                    <div class="mobile-card-sub">李工 · 技术总监</div>
+                  </div>
+                  <span class="badge badge-green">成交</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);margin-top:6px;padding-top:6px;border-top:1px solid var(--gray-100)">
+                  <span>📞 最近跟进：3月25日</span>
+                  <span>下次：4月10日</span>
+                </div>
+              </div>
+              <div class="mobile-card">
+                <div class="mobile-card-header">
+                  <div class="mobile-card-icon" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+                    <span style="color:#fff;font-weight:800;font-size:14px">东</span>
+                  </div>
+                  <div style="flex:1">
+                    <div class="mobile-card-title">东莞启明工业科技</div>
+                    <div class="mobile-card-sub">陈经理 · 生产总监</div>
+                  </div>
+                  <span class="badge badge-teal">维护中</span>
+                </div>
+                <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--gray-500);margin-top:6px;padding-top:6px;border-top:1px solid var(--gray-100)">
+                  <span>📞 最近跟进：3月20日</span>
+                  <span style="color:var(--warning);font-weight:600">今天 16:30</span>
+                </div>
+              </div>
+            </div>
+            <div class="mobile-fab">＋</div>
+            <div class="mobile-bottom-nav">
+              <div class="mobile-nav-item">
+                <div class="mobile-nav-icon">🏠</div>
+                <div class="mobile-nav-label">工作台</div>
+              </div>
+              <div class="mobile-nav-item active">
+                <div class="mobile-nav-icon">👥</div>
+                <div class="mobile-nav-label" style="color:var(--primary-500)">客户</div>
+                <div class="mobile-nav-dot"></div>
+              </div>
+              <div class="mobile-nav-item">
+                <div class="mobile-nav-icon">📈</div>
+                <div class="mobile-nav-label">商机</div>
+              </div>
+              <div class="mobile-nav-item">
+                <div class="mobile-nav-icon">📅</div>
+                <div class="mobile-nav-label">提醒</div>
+              </div>
+              <div class="mobile-nav-item">
+                <div class="mobile-nav-icon">⚙️</div>
+                <div class="mobile-nav-label">设置</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ====================================================
+     7. 新增客户 Modal
+     ==================================================== -->
+<div class="section" id="modal">
+  <h2 class="section-title">表单弹窗 Form Modal</h2>
+  <p class="section-desc">右侧滑入式面板，减少视觉打断，聚焦录入任务</p>
+
+  <div style="background:var(--gray-800);border-radius:var(--radius-xl);overflow:hidden;height:580px;position:relative;display:flex;align-items:stretch">
+    <!-- 背景模拟 -->
+    <div style="flex:1;opacity:.4;overflow:hidden;pointer-events:none;">
+      <div class="app-layout" style="height:580px">
+        <aside class="sidebar" style="width:200px"></aside>
+        <main style="flex:1;background:var(--gray-50)">
+          <div class="topbar" style="opacity:.3"></div>
+        </main>
+      </div>
+    </div>
+    <!-- Modal -->
+    <div style="position:absolute;right:0;top:0;bottom:0;width:440px;display:flex;flex-direction:column">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">新增客户</div>
+          <div style="font-size:12px;opacity:.7;margin-top:2px">填写客户基础信息</div>
+        </div>
+        <div class="modal-close">✕</div>
+      </div>
+      <div class="modal-body" style="flex:1;overflow-y:auto">
+        <div class="form-group">
+          <label>公司名称 *</label>
+          <input class="input" type="text" placeholder="请输入完整公司名称" style="border-color:var(--primary-400);box-shadow:0 0 0 3px rgba(13,148,136,.12)">
+          <div style="font-size:11px;color:var(--gray-400);margin-top:3px">💡 输入名称可自动匹配已有客户</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>联系人</label>
+            <input class="input" type="text" placeholder="姓名">
+          </div>
+          <div class="form-group">
+            <label>职位</label>
+            <input class="input" type="text" placeholder="如：采购总监">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>手机号</label>
+            <input class="input" type="tel" placeholder="138 xxxx xxxx">
+          </div>
+          <div class="form-group">
+            <label>行业</label>
+            <select class="input" style="cursor:pointer">
+              <option>请选择</option>
+              <option>制造业</option>
+              <option>自动化</option>
+              <option>智能制造</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>客户来源</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--gray-700);text-transform:none;letter-spacing:0;font-weight:500">
+              <input type="radio" name="source" checked style="accent-color:var(--primary-500)"> 转介绍
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--gray-700);text-transform:none;letter-spacing:0;font-weight:500">
+              <input type="radio" name="source" style="accent-color:var(--primary-500)"> 展会
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--gray-700);text-transform:none;letter-spacing:0;font-weight:500">
+              <input type="radio" name="source" style="accent-color:var(--primary-500)"> 自开发
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:var(--gray-700);text-transform:none;letter-spacing:0;font-weight:500">
+              <input type="radio" name="source" style="accent-color:var(--primary-500)"> 其他
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>备注</label>
+          <textarea class="input" rows="3" placeholder="记录初步了解的需求或背景..." style="resize:none"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost">取消</button>
+        <button class="btn btn-outline">保存草稿</button>
+        <button class="btn btn-primary">✓ 保存客户</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ====================================================
+     8. 组件库
+     ==================================================== -->
+<div class="section" id="components" style="background:var(--gray-100)">
+  <h2 class="section-title">组件库 Components</h2>
+  <p class="section-desc">可复用的基础 UI 组件，覆盖所有交互状态</p>
+
+  <div class="row">
+    <!-- 按钮 -->
+    <div style="flex:1;min-width:300px">
+      <div class="comp-section">
+        <div class="comp-section-title">按钮 Buttons</div>
+        <div class="comp-row">
+          <button class="btn btn-primary">主要按钮</button>
+          <button class="btn btn-outline">次要按钮</button>
+          <button class="btn btn-ghost">幽灵按钮</button>
+          <button class="btn btn-danger">危险</button>
+        </div>
+        <div class="comp-row">
+          <button class="btn btn-primary btn-lg">大号主要</button>
+          <button class="btn btn-outline btn-sm">小号次要</button>
+          <button class="btn btn-primary" style="opacity:.5;cursor:not-allowed">禁用状态</button>
+        </div>
+        <div class="comp-row">
+          <button class="btn btn-primary">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            新增客户
+          </button>
+          <button class="btn btn-outline">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            导出数据
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 徽章 & 状态 -->
+    <div style="flex:1;min-width:300px">
+      <div class="comp-section">
+        <div class="comp-section-title">状态徽章 Badges</div>
+        <div class="comp-row">
+          <span class="badge badge-green">✓ 成交客户</span>
+          <span class="badge badge-blue">🔵 需求确认</span>
+          <span class="badge badge-orange">跟进中</span>
+          <span class="badge badge-red">⚠ 逾期</span>
+        </div>
+        <div class="comp-row">
+          <span class="badge badge-teal">演示交流</span>
+          <span class="badge badge-yellow">报价谈判</span>
+          <span class="badge badge-gray">待联系</span>
+          <span class="badge" style="background:#ede9fe;color:#5b21b6">维护中</span>
+        </div>
+        <div class="divider"></div>
+        <div class="comp-section-title">输入框 Input</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <input class="input" type="text" placeholder="默认状态">
+          <input class="input" type="text" value="已填写内容" style="border-color:var(--primary-400)">
+          <input class="input" type="text" value="错误状态" style="border-color:var(--danger);box-shadow:0 0 0 3px rgba(239,68,68,.1)">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 数据卡片展示 -->
+  <div class="row" style="margin-top:0">
+    <div style="flex:1">
+      <div class="comp-section">
+        <div class="comp-section-title">信息卡片 Cards</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">
+          <div class="card card-hover" style="padding:var(--sp-4)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--primary-400),var(--primary-600));display:flex;align-items:center;justify-content:center;font-size:18px">📊</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">商机汇总</div>
+                <div style="font-size:12px;color:var(--gray-500)">本月数据</div>
+              </div>
+            </div>
+            <div style="font-size:28px;font-weight:800;color:var(--gray-900)">¥ 560<span style="font-size:14px;font-weight:500;color:var(--gray-500)">万</span></div>
+            <div style="font-size:12px;color:var(--success);font-weight:600;margin-top:4px">▲ 12% 较上月</div>
+          </div>
+          <div class="card card-hover" style="padding:var(--sp-4)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#fb923c,#ea580c);display:flex;align-items:center;justify-content:center;font-size:18px">⏰</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">待跟进</div>
+                <div style="font-size:12px;color:var(--gray-500)">今日提醒</div>
+              </div>
+            </div>
+            <div style="font-size:28px;font-weight:800;color:var(--gray-900)">5<span style="font-size:14px;font-weight:500;color:var(--gray-500)"> 条</span></div>
+            <div style="font-size:12px;color:var(--danger);font-weight:600;margin-top:4px">⚠ 2 条已逾期</div>
+          </div>
+          <div class="card card-hover" style="padding:var(--sp-4)">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+              <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#2563eb);display:flex;align-items:center;justify-content:center;font-size:18px">🏆</div>
+              <div>
+                <div style="font-weight:700;font-size:14px">本月成交</div>
+                <div style="font-size:12px;color:var(--gray-500)">已签合同</div>
+              </div>
+            </div>
+            <div style="font-size:28px;font-weight:800;color:var(--gray-900)">3<span style="font-size:14px;font-weight:500;color:var(--gray-500)"> 单</span></div>
+            <div style="font-size:12px;color:var(--success);font-weight:600;margin-top:4px">✓ 完成目标 75%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 底部 -->
+<div style="background:var(--gray-900);padding:var(--sp-8);text-align:center">
+  <div style="color:#fff;font-size:var(--text-xl);font-weight:800;margin-bottom:8px">CRM UI 设计方案</div>
+  <div style="color:var(--gray-400);font-size:var(--text-sm)">数字化工厂销售管理系统 · UI设计师出品 · 2026</div>
+  <div style="margin-top:var(--sp-6);display:flex;justify-content:center;gap:var(--sp-8);flex-wrap:wrap">
+    <div style="text-align:center">
+      <div style="color:#fff;font-size:var(--text-2xl);font-weight:800">蓝绿 #0d9488</div>
+      <div style="color:var(--gray-500);font-size:var(--text-xs);margin-top:2px">主品牌色</div>
+    </div>
+    <div style="text-align:center">
+      <div style="color:#fff;font-size:var(--text-2xl);font-weight:800">Inter + PingFang SC</div>
+      <div style="color:var(--gray-500);font-size:var(--text-xs);margin-top:2px">主字体</div>
+    </div>
+    <div style="text-align:center">
+      <div style="color:#fff;font-size:var(--text-2xl);font-weight:800">8px 基础间距</div>
+      <div style="color:var(--gray-500);font-size:var(--text-xs);margin-top:2px">间距系统</div>
+    </div>
+    <div style="text-align:center">
+      <div style="color:#fff;font-size:var(--text-2xl);font-weight:800">WCAG AA</div>
+      <div style="color:var(--gray-500);font-size:var(--text-xs);margin-top:2px">可访问性标准</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 导航高亮
+const navLinks = document.querySelectorAll('.doc-nav a');
+const sections = ['tokens','login','dashboard','customers','kanban','mobile','modal','components'];
+window.addEventListener('scroll', () => {
+  let current = sections[0];
+  sections.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.getBoundingClientRect().top < 120) current = id;
+  });
+  navLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+  });
+});
+navLinks.forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    const target = document.querySelector(a.getAttribute('href'));
+    if (target) target.scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+});
+</script>
+</body>
+</html>
